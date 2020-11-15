@@ -17,11 +17,9 @@ pub fn verify_detached(message: &[u8], signature: [u8; sign::SIGNATUREBYTES], pu
     sign::verify_detached(&sig, &message, &key)
 }
 
+#[cfg(test)]
 mod test {
-    use super::sign_detached;
-    use super::verify_detached;
-    use super::generate_random_bytes;
-    use super::sign;
+    use super::*;
 
     #[test]
     fn test_sign_verify() -> () {
