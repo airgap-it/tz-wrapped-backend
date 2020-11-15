@@ -1,0 +1,102 @@
+image: docker:latest
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  GOOGLE_TAG: eu.gcr.io/papers-kubernetes/tz-wrapped-backend:$CI_COMMIT_SHA
+  TEST_TAG: tz_wrapped_backend_test_$CI_COMMIT_SHA
+  GOOGLE_TAG_LATEST: eu.gcr.io/papers-kubernetes/tz-wrapped-backend:latest
+
+stages:
+  - build
+  - test
+  - build_serve
+  - publish
+  - deploy
+
+build:
+  stage: build
+  script:
+    - docker build --target build -t $TEST_TAG .
+  tags:
+    - docker
+
+test:
+  allow_failure: false
+  stage: test
+  script:
+    - docker run --name unit-$CI_COMMIT_SHA $TEST_TAG cargo test
+  after_script:
+    - docker rm -f unit-$CI_COMMIT_SHA || true
+  tags:
+    - docker
+
+build_serve:
+  stage: build_serve
+  when: manual
+  script:
+    - docker build -t $GOOGLE_TAG .
+  tags:
+    - docker
+
+publish:
+  stage: publish
+  when: manual
+  image: google/cloud-sdk
+  before_script:
+    - echo $GCLOUD_GOOGLE_KEY > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT
+    - gcloud config set compute/zone $GCLOUD_ZONE
+    - gcloud config set project $GCLOUD_PROJECT
+    - gcloud auth configure-docker
+  script:
+    - docker tag $GOOGLE_TAG $GOOGLE_TAG_LATEST
+    - docker push $GOOGLE_TAG
+    - docker push $GOOGLE_TAG_LATEST
+  only:
+    - master
+    - develop
+  tags:
+    - docker
+
+k8s-deploy-development:
+  stage: deploy
+  when: manual
+  image: google/cloud-sdk
+  before_script:
+    - echo $GCLOUD_GOOGLE_KEY > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT
+    - gcloud config set project $GCLOUD_PROJECT
+    - gcloud config set compute/zone $GCLOUD_ZONE_DEVELOPMENT
+    - gcloud container clusters get-credentials papers-cluster-development
+  script:
+    - sed -i "s|_TO_BE_REPLACED_BY_IMAGE_TAG_|"$GOOGLE_TAG"|g" k8s/tz-wrapped/common/backend/deployment.yaml
+    - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
+    - kubectl apply -f k8s/tz-wrapped/development/ --recursive
+    - kubectl apply -f k8s/tz-wrapped/common/ --recursive
+  only:
+    - develop
+    - master
+  tags:
+    - docker
+
+k8s-deploy-production:
+  stage: deploy
+  when: manual
+  image: google/cloud-sdk
+  before_script:
+    - echo $GCLOUD_GOOGLE_KEY > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT
+    - gcloud config set project $GCLOUD_PROJECT
+    - gcloud config set compute/zone $GCLOUD_ZONE
+    - gcloud container clusters get-credentials papers-cluster-production
+  script:
+    - sed -i "s|_TO_BE_REPLACED_BY_IMAGE_TAG_|"$GOOGLE_TAG"|g" k8s/tz-wrapped/common/backend/deployment.yaml
+    - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
+    - kubectl apply -f k8s/tz-wrapped/production/ --recursive
+    - kubectl apply -f k8s/tz-wrapped/common/ --recursive
+  only:
+    - master
+  tags:
+    - docker
