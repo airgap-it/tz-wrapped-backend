@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 actix-web = "3"
 sodiumoxide = "0.2.6"
+actix-cors = "0.5.2"
