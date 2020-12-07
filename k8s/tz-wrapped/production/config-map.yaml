@@ -3,3 +3,6 @@ kind: ConfigMap
 metadata:
   name: tz-wrapped-backend-config-map
   namespace: tz-wrapped
+data:
+  DB_NAME: __DB_NAME_PRODUCTION__
+  DB_HOST: postgres-ha-stolon-proxy.default

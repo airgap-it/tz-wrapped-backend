@@ -10,3 +10,11 @@ edition = "2018"
 actix-web = "3"
 sodiumoxide = "0.2.6"
 actix-cors = "0.5.2"
+diesel = { version = "1.4.4", features = ["postgres", "uuidv07", "r2d2", "chrono"] }
+diesel_migrations = "1.4.0"
+dotenv = "0.15.0"
+r2d2 = "0.8.9"
+uuid = { version = "0.8", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde = "1.0.117"
+serde_json = "1.0"

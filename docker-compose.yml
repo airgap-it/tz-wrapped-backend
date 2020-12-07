@@ -1,0 +1,11 @@
+version: '3.1'
+services:
+  postgres:
+    image: postgres:11.9
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: "user"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_DB: "tz-wrapped"
+      POSTGRES_INITDB_ARGS: "--nosync --lc-collate=C"
