@@ -11,6 +11,7 @@ stages:
   - build_serve
   - publish
   - deploy
+  - provision
 
 build:
   stage: build
@@ -70,7 +71,10 @@ k8s-deploy-development:
     - gcloud config set compute/zone $GCLOUD_ZONE_DEVELOPMENT
     - gcloud container clusters get-credentials papers-cluster-development
   script:
-    - sed -i "s|_TO_BE_REPLACED_BY_IMAGE_TAG_|"$GOOGLE_TAG"|g" k8s/tz-wrapped/common/backend/deployment.yaml
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__TO_BE_REPLACED_BY_IMAGE_TAG__|"$GOOGLE_TAG"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_USER__|"$DB_USER_DEVELOPMENT"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_PASSWORD__|"$DB_PASSWORD_DEVELOPMENT"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_DEVELOPMENT__|"$DB_NAME_DEVELOPMENT"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/development/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
@@ -92,7 +96,10 @@ k8s-deploy-production:
     - gcloud config set compute/zone $GCLOUD_ZONE
     - gcloud container clusters get-credentials papers-cluster-production
   script:
-    - sed -i "s|_TO_BE_REPLACED_BY_IMAGE_TAG_|"$GOOGLE_TAG"|g" k8s/tz-wrapped/common/backend/deployment.yaml
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__TO_BE_REPLACED_BY_IMAGE_TAG__|"$GOOGLE_TAG"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_USER__|"$DB_USER_PRODUCTION"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_PASSWORD__|"$DB_PASSWORD_PRODUCTION"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_PRODUCTION__|"$DB_NAME"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/production/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
@@ -100,3 +107,25 @@ k8s-deploy-production:
     - master
   tags:
     - docker
+
+provision-db-development:
+  stage: provision
+  only:
+    - develop
+    - master
+  when: manual
+  image: google/cloud-sdk
+  before_script:
+    - echo $GCLOUD_GOOGLE_KEY > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT
+    - gcloud config set project $GCLOUD_PROJECT
+    - gcloud config set compute/zone $GCLOUD_ZONE_DEVELOPMENT
+    - gcloud container clusters get-credentials papers-cluster-development
+    - export STOLON_PROXY=$(kubectl get pods --all-namespaces | grep stolon-proxy | awk 'NR==1{print $2}')
+  script:
+    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE DATABASE $DB_NAME_DEVELOPMENT\""  || true
+    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE USER $DB_USER_DEVELOPMENT WITH ENCRYPTED PASSWORD '$DB_PASSWORD_DEVELOPMENT'\"" || true
+    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $DB_NAME_DEVELOPMENT to $DB_USER_DEVELOPMENT\""
+  tags:
+    - docker  
