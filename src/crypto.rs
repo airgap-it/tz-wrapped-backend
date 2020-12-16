@@ -1,5 +1,4 @@
-use sodiumoxide::{ crypto, randombytes };
-use crypto::{ sign };
+use sodiumoxide::{ crypto::sign, randombytes, crypto::generichash };
 
 pub fn generate_random_bytes(size: usize) -> Vec<u8> {
     randombytes::randombytes(size)
@@ -15,6 +14,14 @@ pub fn verify_detached(message: &[u8], signature: [u8; sign::SIGNATUREBYTES], pu
     let key = sign::PublicKey(public_key);
     let sig = sign::Signature(signature);
     sign::verify_detached(&sig, &message, &key)
+}
+
+pub fn generic_hash(payload: &[u8], size: usize) -> Result<Vec<u8>, ()> {
+    let mut hasher = generichash::State::new(size, None)?;
+    hasher.update(payload)?;
+    let hash = hasher.finalize()?;
+    
+    Ok(hash.as_ref().to_owned())
 }
 
 #[cfg(test)]

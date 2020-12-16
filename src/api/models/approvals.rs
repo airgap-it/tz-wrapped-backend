@@ -1,30 +1,41 @@
-use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
+
 use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::db::models::{keyholder::Keyholder, operation_approval::OperationApproval};
+use crate::db::models::{operation_approval::OperationApproval, user::User};
+
+use super::{error::APIError, users::UserResponse};
 
 #[derive(Serialize, Deserialize)]
-pub struct ApprovalResponse {
+pub struct OperationApprovalResponse {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub approver: Keyholder,
+    pub approver: UserResponse,
     pub request_id: Uuid,
-    pub kh_signature: String
+    pub kh_signature: String,
 }
 
-
-impl ApprovalResponse {
-
-    pub fn from(operation: OperationApproval, keyholder: Keyholder) -> ApprovalResponse {
-        ApprovalResponse {
+impl OperationApprovalResponse {
+    pub fn from(
+        operation: OperationApproval,
+        keyholder: User,
+    ) -> Result<OperationApprovalResponse, APIError> {
+        Ok(OperationApprovalResponse {
             id: operation.id,
             created_at: operation.created_at,
             updated_at: operation.updated_at,
-            approver: keyholder,
+            approver: UserResponse::try_from(keyholder)?,
             request_id: operation.request,
-            kh_signature: operation.kh_signature
-        }
+            kh_signature: operation.kh_signature,
+        })
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PostOperationApprovalBody {
+    pub request: Uuid,
+    pub kh_signature: String,
 }

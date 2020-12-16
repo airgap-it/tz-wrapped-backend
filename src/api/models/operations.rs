@@ -1,93 +1,122 @@
-use diesel::{r2d2::ConnectionManager, PgConnection};
-use r2d2::PooledConnection;
+use std::convert::TryFrom;
+
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::NaiveDateTime;
 
-use crate::db::models::{contract::Contract, gatekeeper::Gatekeeper, operation_request::OperationRequest };
-use crate::db::schema::operation_requests;
+use crate::db::models::{contract::Contract, operation_request::OperationRequest, user::User};
 
-#[derive(Serialize, Deserialize)]
-pub struct OperationResponse {
+use super::{
+    approvals::PostOperationApprovalBody, contracts::ContractResponse, error::APIError,
+    users::UserResponse,
+};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OperationRequestResponse {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub requester: Gatekeeper,
-    pub destination: Contract,
-    pub target_address: String,
+    pub requester: UserResponse,
+    pub destination: ContractResponse,
+    pub target_address: Option<String>,
     pub amount: i64,
     pub kind: OperationKind,
     pub gk_signature: String,
     pub chain_id: String,
-    pub nonce: i32,
-    pub state: OperationState
+    pub nonce: i64,
+    pub state: OperationState,
+    pub operation_hash: Option<String>,
 }
 
-impl OperationResponse {
-
-    pub fn from(operation: OperationRequest, gatekeeper: Gatekeeper, contract: Contract) -> OperationResponse {
-        OperationResponse {
+impl OperationRequestResponse {
+    pub fn from(
+        operation: OperationRequest,
+        gatekeeper: User,
+        contract: Contract,
+    ) -> Result<OperationRequestResponse, APIError> {
+        Ok(OperationRequestResponse {
             id: operation.id,
             created_at: operation.created_at,
             updated_at: operation.updated_at,
-            requester: gatekeeper,
-            destination: contract,
+            requester: UserResponse::try_from(gatekeeper)?,
+            destination: ContractResponse::try_from(contract)?,
             target_address: operation.target_address,
             amount: operation.amount,
-            kind: match operation.kind {
-                0 => OperationKind::Mint,
-                1 => OperationKind::Burn,
-                _ => OperationKind::Mint
-            },
+            kind: OperationKind::try_from(operation.kind)?,
             gk_signature: operation.gk_signature,
             chain_id: operation.chain_id,
             nonce: operation.nonce,
-            state: match operation.state {
-                0 => OperationState::Open,
-                1 => OperationState::Approved,
-                2 => OperationState::Submitted,
-                _ => OperationState::Open
-            }
+            state: OperationState::try_from(operation.state)?,
+            operation_hash: operation.operation_hash,
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PostOperationRequestBody {
+    pub destination: Uuid,
+    pub target_address: Option<String>,
+    pub amount: i64,
+    pub kind: OperationKind,
+    pub gk_signature: String,
+    pub chain_id: String,
+    pub nonce: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum OperationKind {
+    Mint = 0,
+    Burn = 1,
+}
+
+const MINT: &'static str = "mint";
+const BURN: &'static str = "burn";
+
+impl TryFrom<&str> for OperationKind {
+    type Error = APIError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            MINT => Ok(OperationKind::Mint),
+            BURN => Ok(OperationKind::Burn),
+            _ => Err(APIError::Internal {
+                description: format!("invalid operation kind: {}", value),
+            }),
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct OperationBody {
-    pub destination: Uuid,
-    pub target_address: String,
-    pub amount: i64,
-    pub kind: OperationKind,
-    pub gk_signature: String,
-    pub chain_id: String,
-    pub nonce: i32
-}
+impl TryFrom<i16> for OperationKind {
+    type Error = APIError;
 
-impl OperationBody {
-
-    pub fn find_and_validate_gatekeeper(&self, conn: &PooledConnection<ConnectionManager<PgConnection>>) -> Result<Gatekeeper, diesel::result::Error> {
-        todo!()
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(OperationKind::Mint),
+            1 => Ok(OperationKind::Burn),
+            _ => Err(APIError::InvalidValue {
+                description: format!("operation kind cannot be {}", value),
+            }),
+        }
     }
 }
 
-#[derive(Insertable)]
-#[table_name = "operation_requests"]
-pub struct NewOperation {
-    pub requester: Uuid,
-    pub destination: Uuid,
-    pub target_address: String,
-    pub amount: i64,
-    pub kind: i16,
-    pub gk_signature: String,
-    pub chain_id: String,
-    pub nonce: i32
+impl Into<&'static str> for OperationKind {
+    fn into(self) -> &'static str {
+        match self {
+            OperationKind::Mint => MINT,
+            OperationKind::Burn => BURN,
+        }
+    }
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum OperationKind {
-    Mint = 0,
-    Burn = 1
+impl Into<i16> for OperationKind {
+    fn into(self) -> i16 {
+        match self {
+            OperationKind::Mint => 0,
+            OperationKind::Burn => 1,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
@@ -95,5 +124,59 @@ pub enum OperationKind {
 pub enum OperationState {
     Open = 0,
     Approved = 1,
-    Submitted = 2
+}
+
+const OPEN: &'static str = "open";
+const APPROVED: &'static str = "approved";
+
+impl TryFrom<&str> for OperationState {
+    type Error = APIError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            OPEN => Ok(OperationState::Open),
+            APPROVED => Ok(OperationState::Approved),
+            _ => Err(APIError::InvalidValue {
+                description: format!("operation state cannot be {}", value),
+            }),
+        }
+    }
+}
+
+impl TryFrom<i16> for OperationState {
+    type Error = APIError;
+
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(OperationState::Open),
+            1 => Ok(OperationState::Approved),
+            _ => Err(APIError::InvalidValue {
+                description: format!("operation state cannot be {}", value),
+            }),
+        }
+    }
+}
+
+impl Into<&'static str> for OperationState {
+    fn into(self) -> &'static str {
+        match self {
+            OperationState::Open => OPEN,
+            OperationState::Approved => APPROVED,
+        }
+    }
+}
+
+impl Into<i16> for OperationState {
+    fn into(self) -> i16 {
+        match self {
+            OperationState::Open => 0,
+            OperationState::Approved => 1,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApprovableOperation {
+    pub operation_approval: PostOperationApprovalBody,
+    pub signable_message: String,
 }

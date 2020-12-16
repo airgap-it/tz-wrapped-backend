@@ -1,0 +1,26 @@
+[tezos]
+node_url = "https://delphinet-tezos.giganode.io"
+
+[[contracts]]
+address = "KT1Q66HBBQYaHGAKnxeuedkgLyJYF9jkD96H"
+multisig = "KT1BYMvJoM75JyqFbsLKouqkAv8dgEvViioP"
+name = "tzBTC"
+kind = "fa1"
+token_id = 0
+
+[[contracts.gatekeepers]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+name = "Ugly Release"
+email = "m.godenzi@papers.ch"
+
+[[contracts.keyholders]]
+name = "Ugly Release"
+email = "m.godenzi@papers.ch"
+
+[[contracts.keyholders]]
+name = "Thrive Umbrella"
+email = "m.godenzi@papers.ch"
+
+[[contracts.keyholders]]
+name = "Sudden Push"
+email = "m.godenzi@papers.ch"
