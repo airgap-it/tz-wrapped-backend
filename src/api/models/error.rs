@@ -82,16 +82,22 @@ impl ResponseError for APIError {
 
 impl From<diesel::result::Error> for APIError {
     fn from(error: diesel::result::Error) -> Self {
-        APIError::DBError {
-            description: error.to_string(),
+        match error {
+            diesel::result::Error::NotFound => APIError::NotFound,
+            _ => APIError::DBError {
+                description: error.to_string(),
+            },
         }
     }
 }
 
 impl From<BlockingError<diesel::result::Error>> for APIError {
     fn from(error: BlockingError<diesel::result::Error>) -> Self {
-        APIError::DBError {
-            description: error.to_string(),
+        match error {
+            BlockingError::Error(db_error) => APIError::from(db_error),
+            BlockingError::Canceled => APIError::DBError {
+                description: error.to_string(),
+            },
         }
     }
 }
