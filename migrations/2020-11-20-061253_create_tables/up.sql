@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS operation_approvals (
     request             uuid NOT NULL,
     kh_signature        VARCHAR NOT NULL,
 
+    UNIQUE(approver, request),
     FOREIGN KEY(approver) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(request) REFERENCES operation_requests(id) ON DELETE CASCADE
 );
