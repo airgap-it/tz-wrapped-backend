@@ -17,4 +17,16 @@ r2d2 = "0.8.9"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = "1.0.117"
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
+derive_more = "0.99.11"
+base58check = "0.1.0"
+hex = "0.4.2"
+radix_fmt = "1.0.0"
+num-traits = "0.2"
+num-derive = "0.3"
+reqwest = { version = "0.10.9", features = ["json"] }
+config = "0.10.1"
+lazy_static = "1.4.0"
+
+[dev-dependencies]
+actix-rt = "*"

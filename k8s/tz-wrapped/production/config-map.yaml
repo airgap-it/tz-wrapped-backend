@@ -4,5 +4,6 @@ metadata:
   name: tz-wrapped-backend-config-map
   namespace: tz-wrapped
 data:
-  DB_NAME: __DB_NAME_PRODUCTION__
-  DB_HOST: postgres-ha-stolon-proxy.default
+  TZW_DATABASE__NAME: __DB_NAME_PRODUCTION__
+  TZW_DATABASE__HOST: __DB_HOST_PRODUCTION__
+  RUN_ENV: Production

@@ -1,18 +1,16 @@
 use actix_web::{web, HttpResponse};
 
 mod get;
-mod post;
 
 pub fn api_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::resource("/approvals")
-            .route(web::get().to(get::get_approvals))
-            .route(web::post().to(post::post_approval))
+        web::resource("/users")
+            .route(web::get().to(get::get_users))
             .route(web::head().to(|| HttpResponse::MethodNotAllowed())),
     );
     cfg.service(
-        web::resource("/approvals/{id}")
-            .route(web::get().to(get::get_approval))
+        web::resource("/users/{id}")
+            .route(web::get().to(get::get_user))
             .route(web::head().to(|| HttpResponse::MethodNotAllowed())),
     );
 }

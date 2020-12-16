@@ -75,6 +75,7 @@ k8s-deploy-development:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_USER__|"$DB_USER_DEVELOPMENT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_PASSWORD__|"$DB_PASSWORD_DEVELOPMENT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_DEVELOPMENT__|"$DB_NAME_DEVELOPMENT"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_HOST_DEVELOPMENT__|"$DB_HOST_DEVELOPMENT"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/development/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
@@ -100,6 +101,7 @@ k8s-deploy-production:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_USER__|"$DB_USER_PRODUCTION"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_PASSWORD__|"$DB_PASSWORD_PRODUCTION"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_PRODUCTION__|"$DB_NAME"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_HOST_PRODUCTION__|"$__DB_HOST_PRODUCTION__"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/production/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive

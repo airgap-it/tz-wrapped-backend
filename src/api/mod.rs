@@ -1,5 +1,5 @@
 pub mod operations;
-pub mod gatekeepers;
+pub mod users;
 pub mod contracts;
 pub mod approvals;
 pub mod models;
