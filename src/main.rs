@@ -78,7 +78,7 @@ async fn main() -> std::io::Result<()> {
             .data(pool.clone())
             .wrap(cors)
             .wrap(middleware::Compress::default())
-            .service(web::scope("/app").route("/index.html", web::get().to(index)))
+            .route("/", web::get().to(index))
             .service(
                 web::scope("/api/v1")
                     .data(CONFIG.tezos.clone())
@@ -187,5 +187,6 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
         .await?;
     }
 
+    println!("syncing DB done");
     Ok(())
 }
