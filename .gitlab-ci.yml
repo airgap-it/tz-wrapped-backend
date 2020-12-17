@@ -120,6 +120,6 @@ provision-db-development:
     - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE DATABASE $DB_NAME_DEVELOPMENT\""  || true
     - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE USER $DB_USER_DEVELOPMENT WITH ENCRYPTED PASSWORD '$DB_PASSWORD_DEVELOPMENT'\"" || true
     - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $DB_NAME_DEVELOPMENT to $DB_USER_DEVELOPMENT\"" || true
-    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME --dbname=$DB_NAME_DEVELOPMENT postgres -c \"CREATE EXTENSION IF NOT EXISTS 'uuid-ossp'\"" || true
+    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME --dbname=$DB_NAME_DEVELOPMENT postgres -c \"CREATE EXTENSION IF NOT EXISTS uuid-ossp\"" || true
   tags:
     - docker  
