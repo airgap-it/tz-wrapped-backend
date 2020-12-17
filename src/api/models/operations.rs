@@ -17,7 +17,7 @@ pub struct OperationRequestResponse {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub requester: UserResponse,
-    pub destination: ContractResponse,
+    pub destination: Uuid,
     pub target_address: Option<String>,
     pub amount: i64,
     pub kind: OperationKind,
@@ -32,14 +32,13 @@ impl OperationRequestResponse {
     pub fn from(
         operation: OperationRequest,
         gatekeeper: User,
-        contract: Contract,
     ) -> Result<OperationRequestResponse, APIError> {
         Ok(OperationRequestResponse {
             id: operation.id,
             created_at: operation.created_at,
             updated_at: operation.updated_at,
             requester: UserResponse::try_from(gatekeeper)?,
-            destination: ContractResponse::try_from(contract)?,
+            destination: operation.destination,
             target_address: operation.target_address,
             amount: operation.amount,
             kind: OperationKind::try_from(operation.kind)?,

@@ -80,9 +80,8 @@ fn store_operation(
             .get_result(conn)?;
 
     let gatekeeper = User::get_by_id(conn, inserted_operation.requester)?;
-    let contract = Contract::get_by_id(conn, inserted_operation.destination)?;
 
-    let result = OperationRequestResponse::from(inserted_operation, gatekeeper, contract)?;
+    let result = OperationRequestResponse::from(inserted_operation, gatekeeper)?;
 
     Ok(result)
 }

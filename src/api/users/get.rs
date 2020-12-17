@@ -24,8 +24,9 @@ pub struct Info {
     page: Option<i64>,
     limit: Option<i64>,
     kind: Option<UserKind>,
-    contract: Option<Uuid>,
+    contract_id: Option<Uuid>,
     state: Option<UserState>,
+    address: Option<String>,
 }
 
 pub async fn get_users(
@@ -37,9 +38,18 @@ pub async fn get_users(
     let page = query.page.unwrap_or(0);
     let limit = query.limit.unwrap_or(10);
 
-    let result =
-        web::block(move || load_users(&conn, page, limit, query.kind, query.contract, query.state))
-            .await?;
+    let result = web::block(move || {
+        load_users(
+            &conn,
+            page,
+            limit,
+            query.kind,
+            query.contract_id,
+            query.state,
+            query.address.as_ref(),
+        )
+    })
+    .await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
@@ -49,8 +59,9 @@ fn load_users(
     page: i64,
     limit: i64,
     kind: Option<UserKind>,
-    contract: Option<Uuid>,
+    contract_id: Option<Uuid>,
     state: Option<UserState>,
+    address: Option<&String>,
 ) -> Result<ListResponse<UserResponse>, APIError> {
     let mut users_query = users::dsl::users
         .filter(users::dsl::state.eq(state.unwrap_or(UserState::Active) as i16))
@@ -61,8 +72,12 @@ fn load_users(
         users_query = users_query.filter(users::dsl::kind.eq(kind as i16));
     }
 
-    if let Some(contract) = contract {
-        users_query = users_query.filter(users::dsl::contract_id.eq(contract));
+    if let Some(contract_id) = contract_id {
+        users_query = users_query.filter(users::dsl::contract_id.eq(contract_id));
+    }
+
+    if let Some(address) = address {
+        users_query = users_query.filter(users::dsl::address.eq(address));
     }
 
     let paginated_query = users_query.paginate(page).per_page(limit);

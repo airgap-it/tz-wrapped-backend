@@ -11,13 +11,13 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    api::models::approvals::PostOperationApprovalBody,
-    tezos::contract::{contract_call_for, multisig::Signature},
-    DbPool,
-};
-use crate::{
     api::models::operations::ApprovableOperation,
     db::schema::{contracts, operation_requests, users},
+};
+use crate::{
+    api::models::{approvals::PostOperationApprovalBody, operations::OperationState},
+    tezos::contract::{contract_call_for, multisig::Signature},
+    DbPool,
 };
 use crate::{
     api::models::{
@@ -34,6 +34,7 @@ use crate::{
 #[derive(Deserialize)]
 pub struct Info {
     kind: OperationKind,
+    contract_id: Uuid,
     page: Option<i64>,
     limit: Option<i64>,
 }
@@ -42,14 +43,13 @@ pub async fn get_operations(
     pool: web::Data<DbPool>,
     query: Query<Info>,
 ) -> Result<HttpResponse, APIError> {
-    let conn = pool.get().map_err(|error| APIError::DBError {
-        description: error.to_string(),
-    })?;
+    let conn = pool.get()?;
 
     let page = query.page.unwrap_or(0);
     let limit = query.limit.unwrap_or(10);
     let kind = query.kind;
-    let result = web::block(move || load_operations(&conn, page, limit, kind)).await?;
+    let contract_id = query.contract_id;
+    let result = web::block(move || load_operations(&conn, page, limit, kind, contract_id)).await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
@@ -59,9 +59,11 @@ fn load_operations(
     page: i64,
     limit: i64,
     kind: OperationKind,
+    contract_id: Uuid,
 ) -> Result<ListResponse<OperationRequestResponse>, APIError> {
     let operations_query = operation_requests::dsl::operation_requests
         .filter(operation_requests::dsl::kind.eq(kind as i16))
+        .filter(operation_requests::dsl::destination.eq(contract_id))
         .order_by(operation_requests::dsl::created_at)
         .inner_join(users::table)
         .paginate(page)
@@ -70,18 +72,9 @@ fn load_operations(
     let (operations_with_gatekeepers, total_pages) =
         operations_query.load_and_count_pages::<(OperationRequest, User)>(&conn)?;
 
-    let contracts = contracts::dsl::contracts.load::<Contract>(conn)?;
-
-    // TODO: check of there is a better way to do this (fetch associated contracts)
     let results = operations_with_gatekeepers
         .into_iter()
-        .map(|op| {
-            let contract = contracts
-                .iter()
-                .find(|contract| contract.id.eq(&op.0.destination))
-                .expect("cannot find contract");
-            OperationRequestResponse::from(op.0, op.1, contract.clone())
-        })
+        .map(|op| OperationRequestResponse::from(op.0, op.1))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(ListResponse {
@@ -120,18 +113,15 @@ pub async fn get_operation(
     let conn = pool.get()?;
     let id = path.id;
 
-    let (operation, gatekeeper, contract) = web::block::<_, _, APIError>(move || {
+    let (operation, gatekeeper) = web::block::<_, _, APIError>(move || {
         let operation = OperationRequest::get_by_id(&conn, &id)?;
         let gatekeeper = User::get_by_id(&conn, operation.requester)?;
-        let contract = Contract::get_by_id(&conn, operation.destination)?;
 
-        Ok((operation, gatekeeper, contract))
+        Ok((operation, gatekeeper))
     })
     .await?;
 
-    Ok(HttpResponse::Ok().json(OperationRequestResponse::from(
-        operation, gatekeeper, contract,
-    )?))
+    Ok(HttpResponse::Ok().json(OperationRequestResponse::from(operation, gatekeeper)?))
 }
 
 pub async fn get_signable_message(
