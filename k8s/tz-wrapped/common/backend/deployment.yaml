@@ -27,8 +27,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: tz-wrapped-backend-config-map
-            # - secretRef:
-            #     name: tz-wrapped-backend-secret
+            - secretRef:
+                name: tz-wrapped-backend-secret
           ports:
             - containerPort: 80
           readinessProbe:
