@@ -95,6 +95,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
+    println!("syncing DB");
     let contracts = &CONFIG.contracts;
     let mut conn = pool.get()?;
     let stored_contracts = web::block::<_, _, APIError>(move || {
