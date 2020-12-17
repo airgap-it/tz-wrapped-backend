@@ -53,13 +53,11 @@ async fn index() -> impl Responder {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let database_url = database_url();
-    println!("connecting to db at: {}", database_url);
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool = r2d2::Pool::builder()
         .build(manager)
         .expect("Failed to create pool.");
 
-    println!("running migrations");
     let _result = embedded_migrations::run_with_output(
         &pool
             .get()
