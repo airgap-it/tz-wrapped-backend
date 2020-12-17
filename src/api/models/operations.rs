@@ -4,12 +4,9 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::db::models::{contract::Contract, operation_request::OperationRequest, user::User};
+use crate::db::models::{operation_request::OperationRequest, user::User};
 
-use super::{
-    approvals::PostOperationApprovalBody, contracts::ContractResponse, error::APIError,
-    users::UserResponse,
-};
+use super::{approvals::PostOperationApprovalBody, error::APIError, users::UserResponse};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OperationRequestResponse {
@@ -17,7 +14,7 @@ pub struct OperationRequestResponse {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub requester: UserResponse,
-    pub destination: Uuid,
+    pub contract_id: Uuid,
     pub target_address: Option<String>,
     pub amount: i64,
     pub kind: OperationKind,
@@ -38,7 +35,7 @@ impl OperationRequestResponse {
             created_at: operation.created_at,
             updated_at: operation.updated_at,
             requester: UserResponse::try_from(gatekeeper)?,
-            destination: operation.destination,
+            contract_id: operation.destination,
             target_address: operation.target_address,
             amount: operation.amount,
             kind: OperationKind::try_from(operation.kind)?,
