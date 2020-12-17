@@ -2,7 +2,7 @@
 address = "0.0.0.0:80"
 
 [database]
-host = "localhost"
+host = "postgres"
 port = "5432"
 user = "user"
 password = "password"
