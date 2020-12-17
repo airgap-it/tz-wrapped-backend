@@ -95,7 +95,7 @@ impl Settings {
         let env = std::env::var("RUN_ENV").unwrap_or_else(|_| "Local".into());
         let mut s = Config::new();
         s.set("env", env.clone())?;
-
+        println!("RUN ENV: {}", env);
         s.merge(File::with_name(CONFIG_FILE_PATH))?;
         s.merge(File::with_name(&format!("{}{}", CONFIG_FILE_PREFIX, env)))?;
 
