@@ -1,6 +1,9 @@
 [tezos]
 node_url = "https://delphinet-tezos.giganode.io"
 
+[database]
+host = "localhost"
+
 [[contracts]]
 address = "KT1Q66HBBQYaHGAKnxeuedkgLyJYF9jkD96H"
 multisig = "KT1BYMvJoM75JyqFbsLKouqkAv8dgEvViioP"
