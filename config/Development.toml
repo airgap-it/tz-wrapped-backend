@@ -9,18 +9,18 @@ kind = "fa1"
 token_id = 0
 
 [[contracts.gatekeepers]]
-public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
-name = "Ugly Release"
+public_key = "edpkvVL8vEq7PTm7mbTyomvA3h6RNsJTKt213WN2Z4Zt87cQommPZ3"
+name = "Bitcoin Suisse"
 email = "m.godenzi@papers.ch"
 
 [[contracts.keyholders]]
-name = "Ugly Release"
+name = "inacta"
 email = "m.godenzi@papers.ch"
 
 [[contracts.keyholders]]
-name = "Thrive Umbrella"
+name = "Lexr"
 email = "m.godenzi@papers.ch"
 
 [[contracts.keyholders]]
-name = "Sudden Push"
+name = "Swiss Crypto Tokens"
 email = "m.godenzi@papers.ch"
