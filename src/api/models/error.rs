@@ -34,6 +34,9 @@ pub enum APIError {
     #[display(fmt = "invalid value: {}", description)]
     InvalidValue { description: String },
 
+    #[display(fmt = "invalid operation state: {}", description)]
+    InvalidOperationState { description: String },
+
     #[display(fmt = "unknown error")]
     Unknown,
 }
@@ -48,6 +51,9 @@ impl APIError {
             APIError::Internal { description: _ } => "Internal".to_string(),
             APIError::InvalidOperationRequest { description: _ } => {
                 "InvalidOperationRequest".to_string()
+            }
+            APIError::InvalidOperationState { description: _ } => {
+                "InvalidOperationState".to_string()
             }
             APIError::InvalidValue { description: _ } => "InvalidValue".to_string(),
             APIError::Unknown => "Unknown".to_string(),
@@ -64,6 +70,7 @@ impl ResponseError for APIError {
             APIError::InvalidPublicKey => StatusCode::BAD_REQUEST,
             APIError::Internal { description: _ } => StatusCode::INTERNAL_SERVER_ERROR,
             APIError::InvalidOperationRequest { description: _ } => StatusCode::BAD_REQUEST,
+            APIError::InvalidOperationState { description: _ } => StatusCode::BAD_REQUEST,
             APIError::InvalidValue { description: _ } => StatusCode::BAD_REQUEST,
             APIError::Unknown => StatusCode::INTERNAL_SERVER_ERROR,
         }

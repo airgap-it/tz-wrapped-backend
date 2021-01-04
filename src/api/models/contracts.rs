@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,7 @@ pub struct ContractResponse {
     pub multisig_pkh: String,
     pub kind: ContractKind,
     pub display_name: String,
+    pub min_approvals: i32,
 }
 
 impl TryFrom<contract::Contract> for ContractResponse {
@@ -31,8 +32,9 @@ impl TryFrom<contract::Contract> for ContractResponse {
             pkh: value.pkh,
             token_id: value.token_id,
             multisig_pkh: value.multisig_pkh,
-            kind: value.kind.try_into()?,
+            kind: ContractKind::try_from(value.kind)?,
             display_name: value.display_name,
+            min_approvals: value.min_approvals,
         })
     }
 }

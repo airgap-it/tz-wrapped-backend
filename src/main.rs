@@ -98,12 +98,9 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
     println!("syncing DB");
     let contracts = &CONFIG.contracts;
     let mut conn = pool.get()?;
-    let stored_contracts = web::block::<_, _, APIError>(move || {
-        let _changes = contract::Contract::sync_contracts(&conn, contracts)?;
-
-        Ok(contract::Contract::get_all(&conn)?)
-    })
-    .await?;
+    contract::Contract::sync_contracts(pool, contracts, &CONFIG.tezos.node_url).await?;
+    let stored_contracts =
+        web::block::<_, _, APIError>(move || Ok(contract::Contract::get_all(&conn)?)).await?;
 
     for contract in contracts {
         let gatekeepers = &contract.gatekeepers;

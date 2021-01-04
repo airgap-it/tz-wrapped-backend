@@ -8,6 +8,7 @@ table! {
         multisig_pkh -> Varchar,
         kind -> Int2,
         display_name -> Varchar,
+        min_approvals -> Int4,
     }
 }
 
