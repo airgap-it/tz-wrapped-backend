@@ -110,7 +110,7 @@ pub enum Instruction {
     EmptySet = 0x24,
     Eq = 0x25,
     Exec = 0x26,
-    Failwith = 0x27,
+    FailWith = 0x27,
     Ge = 0x28,
     Get = 0x29,
     Gt = 0x2a,

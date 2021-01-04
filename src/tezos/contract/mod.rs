@@ -7,13 +7,10 @@ use crate::{
     db::models::contract::Contract,
 };
 
-use super::micheline::{
-    prim::Prim,
-    primitive::{Data, Primitive},
-    MichelsonV1Expression,
-};
+use super::micheline::MichelsonV1Expression;
 
 pub mod fa1;
+pub mod fa2;
 pub mod multisig;
 
 pub async fn get_signable_message<'a>(
@@ -51,10 +48,24 @@ pub fn contract_call_for<'a>(
             },
             OperationKind::Burn => Ok(fa1::burn_call_micheline(amount)),
         },
-        ContractKind::FA2 => Ok(MichelsonV1Expression::Prim(Prim::new(
-            Primitive::Data(Data::Unit),
-            None,
-            None,
-        ))),
+        ContractKind::FA2 => match operation_kind {
+            OperationKind::Mint => match target_address {
+                Some(target_address) => Ok(fa2::mint_call_micheline(
+                    target_address.into(),
+                    contract.pkh.clone(),
+                    amount,
+                    contract.token_id.into(),
+                )),
+                _ => Err(APIError::InvalidOperationRequest {
+                    description: "target_address is required for mint operation requests"
+                        .to_owned(),
+                }),
+            },
+            OperationKind::Burn => Ok(fa2::burn_call_micheline(
+                contract.pkh.clone(),
+                amount,
+                contract.token_id.into(),
+            )),
+        },
     }
 }

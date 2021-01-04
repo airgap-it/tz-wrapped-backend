@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ impl TryFrom<contract::Contract> for ContractResponse {
             pkh: value.pkh,
             token_id: value.token_id,
             multisig_pkh: value.multisig_pkh,
-            kind: ContractKind::try_from(value.kind)?,
+            kind: value.kind.try_into()?,
             display_name: value.display_name,
         })
     }

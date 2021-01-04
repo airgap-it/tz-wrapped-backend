@@ -1,11 +1,13 @@
-use std::vec;
+use std::convert::TryFrom;
 
-use crate::tezos::micheline::{extract_int, extract_prim, extract_sequence, extract_string};
+use crate::tezos::micheline::{
+    bytes, data, extract_int, extract_prim, extract_sequence, extract_string, int, sequence,
+    string, types,
+};
 use crate::tezos::{
     coding,
     micheline::{
-        literal::Literal, prim::Prim, primitive::Data, primitive::Primitive, primitive::Type,
-        MichelsonV1Expression, TzError,
+        primitive::Data, primitive::Primitive, primitive::Type, MichelsonV1Expression, TzError,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -73,7 +75,7 @@ impl<'a> Multisig<'a> {
             .await
             .map_err(|_error| TzError::ParsingFailure)?;
 
-        let storage = Storage::from(&response)?;
+        let storage = Storage::try_from(&response)?;
         self.storage = Some(storage);
 
         Ok(self.storage.as_ref().unwrap())
@@ -102,41 +104,13 @@ impl<'a> Multisig<'a> {
         contract_address: String,
         call: MichelsonV1Expression,
     ) -> Result<String, TzError> {
-        let micheline = MichelsonV1Expression::Prim(Prim::new(
-            Primitive::Data(Data::Pair),
-            Some(vec![
-                MichelsonV1Expression::Prim(Prim::new(
-                    Primitive::Data(Data::Pair),
-                    Some(vec![
-                        MichelsonV1Expression::Literal(Literal::String(chain_id)),
-                        MichelsonV1Expression::Literal(Literal::String(String::from(self.address))),
-                    ]),
-                    None,
-                )),
-                MichelsonV1Expression::Prim(Prim::new(
-                    Primitive::Data(Data::Pair),
-                    Some(vec![
-                        MichelsonV1Expression::Literal(Literal::Int(counter)),
-                        MichelsonV1Expression::Prim(Prim::new(
-                            Primitive::Data(Data::Left),
-                            Some(vec![MichelsonV1Expression::Prim(Prim::new(
-                                Primitive::Data(Data::Pair),
-                                Some(vec![
-                                    call,
-                                    MichelsonV1Expression::Literal(Literal::String(
-                                        contract_address,
-                                    )),
-                                ]),
-                                None,
-                            ))]),
-                            None,
-                        )),
-                    ]),
-                    None,
-                )),
-            ]),
-            None,
-        ));
+        let micheline = data::pair(
+            data::pair(string(chain_id), string(self.address.to_owned())),
+            data::pair(
+                int(counter),
+                data::left(data::pair(call, string(contract_address))),
+            ),
+        );
 
         let main_parameter_schema = self.fetch_main_parameter_schema().await?;
         let signable_schema = match &main_parameter_schema {
@@ -150,29 +124,10 @@ impl<'a> Multisig<'a> {
             _ => Err(TzError::InvalidType),
         }?;
 
-        let schema = MichelsonV1Expression::Prim(Prim::new(
-            Primitive::Type(Type::Pair),
-            Some(vec![
-                MichelsonV1Expression::Prim(Prim::new(
-                    Primitive::Type(Type::Pair),
-                    Some(vec![
-                        MichelsonV1Expression::Prim(Prim::new(
-                            Primitive::Type(Type::ChainID),
-                            None,
-                            None,
-                        )),
-                        MichelsonV1Expression::Prim(Prim::new(
-                            Primitive::Type(Type::Contract),
-                            None,
-                            None,
-                        )),
-                    ]),
-                    None,
-                )),
-                signable_schema.to_owned(),
-            ]),
-            None,
-        ));
+        let schema = types::pair(
+            types::pair(types::chain_id(), types::contract()),
+            signable_schema.to_owned(),
+        );
 
         let result = micheline.pack(Some(&schema))?;
 
@@ -196,57 +151,37 @@ impl<'a> Multisig<'a> {
                     .find(|signature| signature.public_key == public_key)
                     .map(|sig| coding::encode_signature(sig.value))
                     .map_or(Ok(None), |r| r.map(Some))
-                    .map(|bytes| {
-                        if let Some(bytes) = bytes {
-                            MichelsonV1Expression::Prim(Prim::new(
-                                Primitive::Data(Data::Some),
-                                Some(vec![MichelsonV1Expression::Literal(Literal::Bytes(bytes))]),
-                                None,
-                            ))
+                    .map(|sig_bytes| {
+                        if let Some(sig_bytes) = sig_bytes {
+                            data::some(bytes(sig_bytes))
                         } else {
-                            MichelsonV1Expression::Prim(Prim::new(
-                                Primitive::Data(Data::None),
-                                None,
-                                None,
-                            ))
+                            data::none()
                         }
                     })
             })
             .collect::<Result<Vec<MichelsonV1Expression>, TzError>>()?;
-        let value = MichelsonV1Expression::Prim(Prim::new(
-            Primitive::Data(Data::Pair),
-            Some(vec![
-                MichelsonV1Expression::Prim(Prim::new(
-                    Primitive::Data(Data::Pair),
-                    Some(vec![
-                        MichelsonV1Expression::Literal(Literal::Int(nonce)),
-                        MichelsonV1Expression::Prim(Prim::new(
-                            Primitive::Data(Data::Left),
-                            Some(vec![MichelsonV1Expression::Prim(Prim::new(
-                                Primitive::Data(Data::Pair),
-                                Some(vec![
-                                    call,
-                                    MichelsonV1Expression::Literal(Literal::Bytes(
-                                        coding::encode_address(contract_address, false)?,
-                                    )),
-                                ]),
-                                None,
-                            ))]),
-                            None,
-                        )),
-                    ]),
-                    None,
+        let value = data::pair(
+            data::pair(
+                int(nonce),
+                data::left(data::pair(
+                    call,
+                    bytes(coding::encode_address(contract_address, false)?),
                 )),
-                MichelsonV1Expression::Sequence(ordered_signature_list),
-            ]),
-            None,
-        ));
+            ),
+            sequence(ordered_signature_list),
+        );
 
         Ok(Parameters {
-            entrypoint: String::from("mainParameter"),
+            entrypoint: "mainParameter".into(),
             value,
         })
     }
+}
+
+trait MultisigStorageParser {
+    fn nonce(&self) -> i64;
+    fn required_number_of_signatures(&self) -> i64;
+    fn keyholders_public_keys(&self) -> Vec<String>;
 }
 
 struct Storage {
@@ -255,8 +190,10 @@ struct Storage {
     approvers_public_keys: Vec<String>,
 }
 
-impl Storage {
-    fn from(micheline: &MichelsonV1Expression) -> Result<Self, TzError> {
+impl TryFrom<&MichelsonV1Expression> for Storage {
+    type Error = TzError;
+
+    fn try_from(micheline: &MichelsonV1Expression) -> Result<Self, Self::Error> {
         let mut value = extract_prim(micheline)?;
 
         if value.prim != Primitive::Data(Data::Pair) || value.args_count() != 2 {

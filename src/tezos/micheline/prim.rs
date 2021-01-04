@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -26,9 +28,18 @@ impl Prim {
         Prim { prim, args, annots }
     }
 
-    pub fn type_info(&self) -> Result<(Type, Option<&Vec<MichelsonV1Expression>>), TzError> {
+    pub fn type_info(
+        &self,
+    ) -> Result<
+        (
+            Type,
+            Option<&Vec<MichelsonV1Expression>>,
+            Option<&Vec<String>>,
+        ),
+        TzError,
+    > {
         match self.prim {
-            Primitive::Type(value) => Ok((value, self.args.as_ref())),
+            Primitive::Type(value) => Ok((value, self.args.as_ref(), self.annots.as_ref())),
             _ => Err(TzError::InvalidType),
         }
     }
@@ -105,7 +116,7 @@ impl HexDecodable for Prim {
     where
         Self: Sized,
     {
-        let prefix = MessagePrefix::from(encoded.consume_bytes(1)?)?;
+        let prefix = MessagePrefix::try_from(encoded.consume_bytes(1)?)?;
         let op_code = encoded.consume_bytes(1)?;
         let prim = Primitive::from(op_code)?;
         let args_count = prefix
@@ -151,26 +162,7 @@ impl MessagePrefix {
         let value = std::cmp::min(2 * args_count + (if !has_annots { 0 } else { 1 }) + 3, 9);
         let value_string = utils::num_to_padded_str(value, Some(2), None);
 
-        Self::from(&value_string)
-    }
-
-    pub fn from_int(value: u8) -> Result<Self, TzError> {
-        let value_string = utils::num_to_padded_str(value, Some(2), None);
-
-        Self::from(&value_string)
-    }
-
-    pub fn from(value: &str) -> Result<Self, TzError> {
-        match value {
-            "03" => Ok(Self::Prim0Args),
-            "04" => Ok(Self::Prim0ArgsAnnots),
-            "05" => Ok(Self::Prim1Arg),
-            "06" => Ok(Self::Prim1ArgAnnots),
-            "07" => Ok(Self::Prim2Args),
-            "08" => Ok(Self::Prim2ArgsAnnots),
-            "09" => Ok(Self::PrimNArgsAnnots),
-            _ => Err(TzError::InvalidType),
-        }
+        Self::try_from(value_string.as_ref())
     }
 
     pub fn prefix(&self) -> &str {
@@ -201,6 +193,33 @@ impl MessagePrefix {
             MessagePrefix::Prim1Arg | MessagePrefix::Prim1ArgAnnots => Some(1),
             MessagePrefix::Prim2Args | MessagePrefix::Prim2ArgsAnnots => Some(2),
             MessagePrefix::PrimNArgsAnnots => None,
+        }
+    }
+}
+
+impl TryFrom<u8> for MessagePrefix {
+    type Error = TzError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        let value_string = utils::num_to_padded_str(value, Some(2), None);
+
+        MessagePrefix::try_from(value_string.as_ref())
+    }
+}
+
+impl TryFrom<&str> for MessagePrefix {
+    type Error = TzError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "03" => Ok(Self::Prim0Args),
+            "04" => Ok(Self::Prim0ArgsAnnots),
+            "05" => Ok(Self::Prim1Arg),
+            "06" => Ok(Self::Prim1ArgAnnots),
+            "07" => Ok(Self::Prim2Args),
+            "08" => Ok(Self::Prim2ArgsAnnots),
+            "09" => Ok(Self::PrimNArgsAnnots),
+            _ => Err(TzError::InvalidType),
         }
     }
 }

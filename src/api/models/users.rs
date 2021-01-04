@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -31,8 +31,8 @@ impl TryFrom<user::User> for UserResponse {
             public_key: value.public_key,
             address: value.address,
             contract_id: value.contract_id,
-            kind: UserKind::try_from(value.kind)?,
-            state: UserState::try_from(value.state)?,
+            kind: value.kind.try_into()?,
+            state: value.state.try_into()?,
             display_name: value.display_name,
         })
     }
