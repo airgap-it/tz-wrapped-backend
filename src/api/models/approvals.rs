@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::TryInto;
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ impl OperationApprovalResponse {
             id: operation.id,
             created_at: operation.created_at,
             updated_at: operation.updated_at,
-            approver: UserResponse::try_from(keyholder)?,
+            approver: keyholder.try_into()?,
             request_id: operation.request,
             kh_signature: operation.kh_signature,
         })

@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::TryInto;
 
 use actix_web::{
     web,
@@ -11,13 +11,13 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    api::models::operations::ApprovableOperation,
-    db::schema::{contracts, operation_requests, users},
-};
-use crate::{
-    api::models::{approvals::PostOperationApprovalBody, operations::OperationState},
+    api::models::approvals::PostOperationApprovalBody,
     tezos::contract::{contract_call_for, multisig::Signature},
     DbPool,
+};
+use crate::{
+    api::models::operations::ApprovableOperation,
+    db::schema::{operation_requests, users},
 };
 use crate::{
     api::models::{
@@ -139,7 +139,7 @@ pub async fn get_signable_message(
 
     let message = tezos::contract::get_signable_message(
         &contract,
-        OperationKind::try_from(operation.kind)?,
+        operation.kind.try_into()?,
         operation.target_address.as_ref(),
         operation.amount,
         operation.nonce,
@@ -179,7 +179,7 @@ pub async fn get_operation_parameters(
     );
     let call = contract_call_for(
         &contract,
-        OperationKind::try_from(operation.kind)?,
+        operation.kind.try_into()?,
         operation.target_address.as_ref(),
         operation.amount,
     )?;

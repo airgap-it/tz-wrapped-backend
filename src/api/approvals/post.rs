@@ -1,17 +1,9 @@
-use std::convert::TryFrom;
+use std::convert::TryInto;
 
 use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use crate::{
-    api::models::operations::OperationKind,
-    crypto,
-    db::models::{
-        operation_approval::OperationApproval,
-        user::{SyncUser, User},
-    },
-};
 use crate::{api::models::users::UserKind, tezos::contract::get_signable_message};
 use crate::{
     api::models::{
@@ -19,6 +11,13 @@ use crate::{
         error::APIError,
     },
     tezos::contract::multisig::Multisig,
+};
+use crate::{
+    crypto,
+    db::models::{
+        operation_approval::OperationApproval,
+        user::{SyncUser, User},
+    },
 };
 use crate::{
     db::models::{
@@ -48,7 +47,7 @@ pub async fn post_approval(
 
     let message = get_signable_message(
         &contract,
-        OperationKind::try_from(operation_request.kind)?,
+        operation_request.kind.try_into()?,
         operation_request.target_address.as_ref(),
         operation_request.amount,
         operation_request.nonce.into(),

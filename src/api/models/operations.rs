@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -34,15 +34,15 @@ impl OperationRequestResponse {
             id: operation.id,
             created_at: operation.created_at,
             updated_at: operation.updated_at,
-            requester: UserResponse::try_from(gatekeeper)?,
+            requester: gatekeeper.try_into()?,
             contract_id: operation.destination,
             target_address: operation.target_address,
             amount: operation.amount,
-            kind: OperationKind::try_from(operation.kind)?,
+            kind: operation.kind.try_into()?,
             gk_signature: operation.gk_signature,
             chain_id: operation.chain_id,
             nonce: operation.nonce,
-            state: OperationState::try_from(operation.state)?,
+            state: operation.state.try_into()?,
             operation_hash: operation.operation_hash,
         })
     }
