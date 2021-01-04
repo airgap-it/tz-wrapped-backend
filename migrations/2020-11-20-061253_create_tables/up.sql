@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     multisig_pkh        VARCHAR NOT NULL,
     kind                SMALLINT NOT NULL,
     display_name        VARCHAR NOT NULL,
+    min_approvals       INTEGER NOT NULL,
 
     UNIQUE(pkh, token_id)
 );

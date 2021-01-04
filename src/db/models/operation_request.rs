@@ -52,6 +52,21 @@ impl OperationRequest {
         Ok(())
     }
 
+    pub fn mark_injected(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        id: &Uuid,
+        operation_hash: String,
+    ) -> Result<(), diesel::result::Error> {
+        let _result = diesel::update(operation_requests::dsl::operation_requests.find(id))
+            .set((
+                operation_requests::dsl::state.eq(OperationState::Injected as i16),
+                operation_requests::dsl::operation_hash.eq(Some(operation_hash)),
+            ))
+            .execute(conn)?;
+
+        Ok(())
+    }
+
     pub fn max_nonce(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         contract_id: &Uuid,
@@ -74,7 +89,7 @@ impl OperationRequest {
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug)]
 #[table_name = "operation_requests"]
 pub struct NewOperationRequest {
     pub requester: Uuid,
@@ -85,4 +100,12 @@ pub struct NewOperationRequest {
     pub gk_signature: String,
     pub chain_id: String,
     pub nonce: i64,
+}
+
+#[derive(AsChangeset, Debug)]
+#[table_name = "operation_requests"]
+pub struct UpdateOperation {
+    pub id: Uuid,
+    pub operation_hash: String,
+    pub state: i16,
 }

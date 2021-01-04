@@ -22,7 +22,7 @@ use crate::{
     crypto,
 };
 
-pub async fn post_operations(
+pub async fn post_operation(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
     body: web::Json<PostOperationRequestBody>,

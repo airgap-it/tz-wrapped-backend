@@ -1,4 +1,7 @@
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -59,6 +62,11 @@ pub struct PostOperationRequestBody {
     pub nonce: i64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PatchOperationRequestBody {
+    pub operation_hash: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum OperationKind {
@@ -115,15 +123,17 @@ impl Into<i16> for OperationKind {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum OperationState {
     Open = 0,
     Approved = 1,
+    Injected = 2,
 }
 
 const OPEN: &'static str = "open";
 const APPROVED: &'static str = "approved";
+const INJECTED: &'static str = "injected";
 
 impl TryFrom<&str> for OperationState {
     type Error = APIError;
@@ -132,6 +142,7 @@ impl TryFrom<&str> for OperationState {
         match value {
             OPEN => Ok(OperationState::Open),
             APPROVED => Ok(OperationState::Approved),
+            INJECTED => Ok(OperationState::Injected),
             _ => Err(APIError::InvalidValue {
                 description: format!("operation state cannot be {}", value),
             }),
@@ -146,6 +157,7 @@ impl TryFrom<i16> for OperationState {
         match value {
             0 => Ok(OperationState::Open),
             1 => Ok(OperationState::Approved),
+            2 => Ok(OperationState::Injected),
             _ => Err(APIError::InvalidValue {
                 description: format!("operation state cannot be {}", value),
             }),
@@ -158,6 +170,7 @@ impl Into<&'static str> for OperationState {
         match self {
             OperationState::Open => OPEN,
             OperationState::Approved => APPROVED,
+            OperationState::Injected => INJECTED,
         }
     }
 }
@@ -167,7 +180,19 @@ impl Into<i16> for OperationState {
         match self {
             OperationState::Open => 0,
             OperationState::Approved => 1,
+            OperationState::Injected => 2,
         }
+    }
+}
+
+impl Display for OperationState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value: &'static str = match self {
+            OperationState::Open => OPEN,
+            OperationState::Approved => APPROVED,
+            OperationState::Injected => INJECTED,
+        };
+        write!(f, "{}", value)
     }
 }
 
