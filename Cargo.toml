@@ -27,6 +27,9 @@ num-derive = "0.3"
 reqwest = { version = "0.10.9", features = ["json"] }
 config = "0.10.1"
 lazy_static = "1.4.0"
+lettre = "0.9"
+lettre_email = "0.9"
+native-tls = "0.2"
 
 [dev-dependencies]
 actix-rt = "*"

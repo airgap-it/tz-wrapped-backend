@@ -20,6 +20,14 @@ pub struct Database {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct SMTP {
+    pub host: String,
+    pub port: String,
+    pub user: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Tezos {
     pub node_url: String,
 }
@@ -52,6 +60,7 @@ pub struct Keyholder {
 pub struct Settings {
     pub server: Server,
     pub database: Database,
+    pub smtp: SMTP,
     pub tezos: Tezos,
     pub contracts: Vec<Contract>,
     pub env: ENV,
