@@ -10,6 +10,11 @@ token_id = 0
 
 [[contracts.gatekeepers]]
 public_key = "edpkvVL8vEq7PTm7mbTyomvA3h6RNsJTKt213WN2Z4Zt87cQommPZ3"
+name = "Tester"
+email = "m.godenzi@papers.ch"
+
+[[contracts.gatekeepers]]
+public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
 name = "Bitcoin Suisse"
 email = "m.godenzi@papers.ch"
 
