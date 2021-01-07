@@ -10,6 +10,9 @@ extern crate diesel_migrations;
 extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
+extern crate lettre;
+extern crate lettre_email;
+extern crate native_tls;
 
 use api::models::{error::APIError, users::UserKind};
 use db::models::contract;
@@ -24,6 +27,7 @@ use user::SyncUser;
 mod api;
 mod crypto;
 mod db;
+mod notifications;
 mod settings;
 mod tezos;
 

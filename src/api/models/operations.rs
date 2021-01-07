@@ -123,6 +123,16 @@ impl Into<i16> for OperationKind {
     }
 }
 
+impl Display for OperationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value: &str = match self {
+            OperationKind::Mint => MINT,
+            OperationKind::Burn => BURN,
+        };
+        write!(f, "{}", value)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum OperationState {

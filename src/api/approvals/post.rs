@@ -10,6 +10,7 @@ use crate::{
         approvals::{OperationApprovalResponse, PostOperationApprovalBody},
         error::APIError,
     },
+    notifications::notify_min_approvals_received,
     tezos::contract::multisig::Multisig,
 };
 use crate::{
@@ -78,7 +79,23 @@ pub async fn post_approval(
 
     conn = pool.get()?;
     if total_approvals >= min_approvals {
-        web::block(move || OperationRequest::mark_approved(&conn, &request_id)).await?;
+        web::block(move || {
+            let result = OperationRequest::mark_approved(&conn, &request_id);
+
+            if result.is_ok() {
+                let gatekeeper = User::get_by_id(&conn, operation_request.requester);
+                if let Ok(gatekeeper) = gatekeeper {
+                    let _notification_result = notify_min_approvals_received(
+                        gatekeeper,
+                        operation_request.kind.try_into().unwrap(),
+                        contract,
+                    );
+                }
+            }
+
+            result
+        })
+        .await?;
     }
 
     Ok(HttpResponse::Ok().json(result))

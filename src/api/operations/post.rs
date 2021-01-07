@@ -2,11 +2,6 @@ use actix_web::{web, HttpResponse};
 use diesel::{prelude::*, r2d2::ConnectionManager};
 use r2d2::PooledConnection;
 
-use crate::db::models::{
-    contract::Contract,
-    operation_request::{NewOperationRequest, OperationRequest},
-    user::User,
-};
 use crate::db::schema::operation_requests;
 use crate::settings;
 use crate::tezos::contract::get_signable_message;
@@ -21,13 +16,21 @@ use crate::{
     },
     crypto,
 };
+use crate::{
+    db::models::{
+        contract::Contract,
+        operation_request::{NewOperationRequest, OperationRequest},
+        user::User,
+    },
+    notifications::notify_new_operation_request,
+};
 
 pub async fn post_operation(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
     body: web::Json<PostOperationRequestBody>,
 ) -> Result<HttpResponse, APIError> {
-    let mut conn = pool.get()?;
+    let conn = pool.get()?;
     let contract_id = body.destination;
     let contract = web::block(move || Contract::get_by_id(&conn, contract_id)).await?;
 
@@ -47,7 +50,7 @@ pub async fn post_operation(
     )
     .await?;
 
-    conn = pool.get()?;
+    let conn = pool.get()?;
     let result = web::block(move || {
         let body = body.into_inner();
         let gatekeeper = find_and_validate_gatekeeper(&conn, &body, message)?;
@@ -63,7 +66,20 @@ pub async fn post_operation(
             nonce: body.nonce,
         };
 
-        store_operation(&conn, &operation)
+        let result = store_operation(&conn, &operation);
+
+        if result.is_ok() {
+            let contract = Contract::get_by_id(&conn, body.destination);
+            if let Ok(contract) = contract {
+                let keyholders = User::get_active(&conn, contract.id, UserKind::Keyholder);
+                if let Ok(keyholders) = keyholders {
+                    let _notification_result =
+                        notify_new_operation_request(keyholders, body.kind, contract);
+                }
+            }
+        }
+
+        result
     })
     .await?;
 

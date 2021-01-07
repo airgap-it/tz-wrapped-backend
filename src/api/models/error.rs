@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use actix_web::{error::BlockingError, http::StatusCode, HttpResponse, ResponseError};
 use derive_more::{Display, Error};
 use serde::Serialize;
@@ -133,5 +135,35 @@ impl From<tezos::micheline::TzError> for APIError {
         APIError::Internal {
             description: value.to_string(),
         }
+    }
+}
+
+impl From<lettre::smtp::error::Error> for APIError {
+    fn from(_: lettre::smtp::error::Error) -> Self {
+        APIError::Unknown
+    }
+}
+
+impl From<lettre::error::Error> for APIError {
+    fn from(_: lettre::error::Error) -> Self {
+        APIError::Unknown
+    }
+}
+
+impl From<lettre_email::error::Error> for APIError {
+    fn from(_: lettre_email::error::Error) -> Self {
+        APIError::Unknown
+    }
+}
+
+impl From<native_tls::Error> for APIError {
+    fn from(_: native_tls::Error) -> Self {
+        APIError::Unknown
+    }
+}
+
+impl From<ParseIntError> for APIError {
+    fn from(_: ParseIntError) -> Self {
+        APIError::Unknown
     }
 }
