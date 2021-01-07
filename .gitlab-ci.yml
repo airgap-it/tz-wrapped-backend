@@ -69,7 +69,6 @@ k8s-deploy-development:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_DEVELOPMENT__|"$DB_NAME_DEVELOPMENT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_HOST_DEVELOPMENT__|"$DB_HOST_DEVELOPMENT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PORT__|"$SMTP_PORT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
@@ -99,7 +98,6 @@ k8s-deploy-production:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_PRODUCTION__|"$DB_NAME"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_HOST_PRODUCTION__|"$__DB_HOST_PRODUCTION__"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PORT__|"$SMTP_PORT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
