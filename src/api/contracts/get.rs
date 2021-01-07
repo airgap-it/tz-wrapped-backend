@@ -126,7 +126,7 @@ pub async fn get_signable_message(
     let (contract, max_nonce) = web::block::<_, _, APIError>(move || {
         let contract = Contract::get_by_id(&conn, id)?;
         let max_nonce = OperationRequest::max_nonce(&conn, &contract.id)?;
-
+        
         Ok((contract, max_nonce))
     })
     .await?;

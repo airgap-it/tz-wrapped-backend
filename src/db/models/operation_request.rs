@@ -71,12 +71,12 @@ impl OperationRequest {
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         contract_id: &Uuid,
     ) -> Result<i64, diesel::result::Error> {
-        let nonce = operation_requests::dsl::operation_requests
-            .select(max(operation_requests::dsl::nonce))
+        let op: OperationRequest = operation_requests::dsl::operation_requests
             .filter(operation_requests::dsl::destination.eq(contract_id))
-            .execute(conn)?;
+            .order_by(operation_requests::dsl::nonce.desc())
+            .first(conn)?;
 
-        Ok(nonce as i64)
+        Ok(op.nonce as i64)
     }
 
     pub fn approvals(
