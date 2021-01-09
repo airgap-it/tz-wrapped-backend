@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::error::APIError;
-use crate::db::models::user;
+use crate::db::models::user::User as DBUser;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct UserResponse {
+pub struct User {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -20,11 +20,11 @@ pub struct UserResponse {
     pub display_name: String,
 }
 
-impl TryFrom<user::User> for UserResponse {
+impl TryFrom<DBUser> for User {
     type Error = APIError;
 
-    fn try_from(value: user::User) -> Result<Self, Self::Error> {
-        Ok(UserResponse {
+    fn try_from(value: DBUser) -> Result<Self, Self::Error> {
+        Ok(User {
             id: value.id,
             created_at: value.created_at,
             updated_at: value.updated_at,

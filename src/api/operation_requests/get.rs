@@ -5,41 +5,35 @@ use actix_web::{
     web::{Path, Query},
     HttpResponse,
 };
-use diesel::{prelude::*, r2d2::ConnectionManager};
-use r2d2::PooledConnection;
+use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::{
-    api::models::approvals::PostOperationApprovalBody,
-    tezos::contract::{contract_call_for, multisig::Signature},
-    DbPool,
+use crate::api::models::{
+    common::ListResponse, error::APIError, operation_approval::NewOperationApproval,
+    operation_request::ApprovableOperationRequest, operation_request::OperationRequest,
+    operation_request::OperationRequestKind,
 };
-use crate::{
-    api::models::operations::ApprovableOperation,
-    db::schema::{operation_requests, users},
+use crate::db::models::{
+    contract::Contract, operation_request::OperationRequest as DBOperationRequest, user::User,
 };
-use crate::{
-    api::models::{
-        common::ListResponse, error::APIError, operations::OperationKind,
-        operations::OperationRequestResponse, pagination::*,
-    },
-    settings,
+use crate::settings;
+use crate::tezos::{
+    self,
+    contract::multisig::Multisig,
+    contract::{contract_call_for, multisig::Signature},
 };
-use crate::{
-    db::models::{contract::Contract, operation_request::OperationRequest, user::User},
-    tezos::{self, contract::multisig::Multisig},
-};
+use crate::DbPool;
 
 #[derive(Deserialize)]
 pub struct Info {
-    kind: OperationKind,
+    kind: OperationRequestKind,
     contract_id: Uuid,
     page: Option<i64>,
     limit: Option<i64>,
 }
 
-pub async fn get_operations(
+pub async fn get_operation_requests(
     pool: web::Data<DbPool>,
     query: Query<Info>,
 ) -> Result<HttpResponse, APIError> {
@@ -49,32 +43,25 @@ pub async fn get_operations(
     let limit = query.limit.unwrap_or(10);
     let kind = query.kind;
     let contract_id = query.contract_id;
-    let result = web::block(move || load_operations(&conn, page, limit, kind, contract_id)).await?;
+    let result =
+        web::block(move || load_operation_requests(&conn, page, limit, kind, contract_id)).await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
 
-fn load_operations(
+fn load_operation_requests(
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
     page: i64,
     limit: i64,
-    kind: OperationKind,
+    kind: OperationRequestKind,
     contract_id: Uuid,
-) -> Result<ListResponse<OperationRequestResponse>, APIError> {
-    let operations_query = operation_requests::dsl::operation_requests
-        .filter(operation_requests::dsl::kind.eq(kind as i16))
-        .filter(operation_requests::dsl::destination.eq(contract_id))
-        .order_by(operation_requests::dsl::created_at)
-        .inner_join(users::table)
-        .paginate(page)
-        .per_page(limit);
-
+) -> Result<ListResponse<OperationRequest>, APIError> {
     let (operations_with_gatekeepers, total_pages) =
-        operations_query.load_and_count_pages::<(OperationRequest, User)>(&conn)?;
+        DBOperationRequest::get_list(conn, kind, contract_id, page, limit)?;
 
     let results = operations_with_gatekeepers
         .into_iter()
-        .map(|op| OperationRequestResponse::from(op.0, op.1))
+        .map(|op| OperationRequest::from(op.0, op.1))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(ListResponse {
@@ -86,15 +73,15 @@ fn load_operations(
 
 async fn load_operation_and_contract(
     pool: &web::Data<DbPool>,
-    operation_id: &Uuid,
-) -> Result<(OperationRequest, Contract), APIError> {
+    operation_request_id: &Uuid,
+) -> Result<(DBOperationRequest, Contract), APIError> {
     let conn = pool.get()?;
-    let id = operation_id.clone();
+    let id = operation_request_id.clone();
     let result = web::block::<_, _, APIError>(move || {
-        let operation = OperationRequest::get_by_id(&conn, &id)?;
-        let contract = Contract::get_by_id(&conn, operation.destination)?;
+        let operation_request = DBOperationRequest::get_by_id(&conn, &id)?;
+        let contract = Contract::get_by_id(&conn, operation_request.contract_id)?;
 
-        Ok((operation, contract))
+        Ok((operation_request, contract))
     })
     .await?;
 
@@ -106,22 +93,22 @@ pub struct PathInfo {
     id: Uuid,
 }
 
-pub async fn get_operation(
+pub async fn get_operation_request(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
 ) -> Result<HttpResponse, APIError> {
     let conn = pool.get()?;
     let id = path.id;
 
-    let (operation, gatekeeper) = web::block::<_, _, APIError>(move || {
-        let operation = OperationRequest::get_by_id(&conn, &id)?;
-        let gatekeeper = User::get_by_id(&conn, operation.requester)?;
+    let (operation_request, gatekeeper) = web::block::<_, _, APIError>(move || {
+        let operation_request = DBOperationRequest::get_by_id(&conn, &id)?;
+        let gatekeeper = User::get_by_id(&conn, operation_request.gatekeeper_id)?;
 
-        Ok((operation, gatekeeper))
+        Ok((operation_request, gatekeeper))
     })
     .await?;
 
-    Ok(HttpResponse::Ok().json(OperationRequestResponse::from(operation, gatekeeper)?))
+    Ok(HttpResponse::Ok().json(OperationRequest::from(operation_request, gatekeeper)?))
 }
 
 pub async fn get_signable_message(
@@ -148,16 +135,16 @@ pub async fn get_signable_message(
     )
     .await?;
 
-    Ok(HttpResponse::Ok().json(ApprovableOperation {
-        operation_approval: PostOperationApprovalBody {
-            request: id,
-            kh_signature: String::from(""),
+    Ok(HttpResponse::Ok().json(ApprovableOperationRequest {
+        unsigned_operation_approval: NewOperationApproval {
+            operation_request_id: id,
+            signature: String::from(""),
         },
         signable_message: message,
     }))
 }
 
-pub async fn get_operation_parameters(
+pub async fn get_operation_request_parameters(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
     tezos_settings: web::Data<settings::Tezos>,
@@ -165,11 +152,11 @@ pub async fn get_operation_parameters(
     let conn = pool.get()?;
     let id = path.id;
     let (operation, contract, approvals) = web::block::<_, _, APIError>(move || {
-        let operation = OperationRequest::get_by_id(&conn, &id)?;
-        let contract = Contract::get_by_id(&conn, operation.destination)?;
-        let approvals = operation.approvals(&conn)?;
+        let operation_request = DBOperationRequest::get_by_id(&conn, &id)?;
+        let contract = Contract::get_by_id(&conn, operation_request.contract_id)?;
+        let approvals = operation_request.approvals(&conn)?;
 
-        Ok((operation, contract, approvals))
+        Ok((operation_request, contract, approvals))
     })
     .await?;
 
@@ -186,7 +173,7 @@ pub async fn get_operation_parameters(
     let signatures = approvals
         .iter()
         .map(|(approval, user)| Signature {
-            value: approval.kh_signature.as_ref(),
+            value: approval.signature.as_ref(),
             public_key: user.public_key.as_ref(),
         })
         .collect::<Vec<Signature>>();

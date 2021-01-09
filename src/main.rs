@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer, Responder};
 
@@ -6,7 +7,7 @@ extern crate diesel;
 extern crate dotenv;
 #[macro_use]
 extern crate diesel_migrations;
-#[macro_use]
+// #[macro_use]
 extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
@@ -14,7 +15,7 @@ extern crate lettre;
 extern crate lettre_email;
 extern crate native_tls;
 
-use api::models::{error::APIError, users::UserKind};
+use api::models::{error::APIError, user::UserKind};
 use db::models::contract;
 use db::models::user;
 use diesel::pg::PgConnection;
@@ -86,11 +87,11 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/api/v1")
                     .data(CONFIG.tezos.clone())
-                    .configure(api::operations::api_config)
+                    .configure(api::operation_requests::api_config)
                     .configure(api::users::api_config)
                     .configure(api::contracts::api_config)
                     .data(CONFIG.contracts.clone())
-                    .configure(api::approvals::api_config),
+                    .configure(api::operation_approvals::api_config),
             )
     })
     .bind(&CONFIG.server.address)?

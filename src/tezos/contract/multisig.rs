@@ -125,7 +125,7 @@ impl<'a> Multisig<'a> {
         }?;
 
         let schema = types::pair(
-            types::pair(types::chain_id(), types::contract()),
+            types::pair(types::chain_id(), types::address()),
             signable_schema.to_owned(),
         );
 

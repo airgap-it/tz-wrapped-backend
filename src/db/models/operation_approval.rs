@@ -5,25 +5,27 @@ use diesel::{prelude::*, r2d2::ConnectionManager, PgConnection};
 use r2d2::PooledConnection;
 use uuid::Uuid;
 
+use super::pagination::Paginate;
+
 #[derive(Queryable, Identifiable, Associations, Debug)]
-#[belongs_to(User, foreign_key = "approver")]
-#[belongs_to(OperationRequest, foreign_key = "request")]
+#[belongs_to(User, foreign_key = "keyholder_id")]
+#[belongs_to(OperationRequest, foreign_key = "operation_request_id")]
 pub struct OperationApproval {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub approver: Uuid,
-    pub request: Uuid,
-    pub kh_signature: String,
+    pub keyholder_id: Uuid,
+    pub operation_request_id: Uuid,
+    pub signature: String,
 }
 
 impl OperationApproval {
     pub fn count(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
-        request_id: &Uuid,
+        operation_request_id: &Uuid,
     ) -> Result<i64, diesel::result::Error> {
         let count = operation_approvals::dsl::operation_approvals
-            .filter(operation_approvals::dsl::request.eq(request_id))
+            .filter(operation_approvals::dsl::operation_request_id.eq(operation_request_id))
             .count()
             .get_result::<i64>(conn)?;
 
@@ -40,12 +42,37 @@ impl OperationApproval {
 
         Ok(result)
     }
+
+    pub fn get_list(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        operation_request_id: Uuid,
+        page: i64,
+        limit: i64,
+    ) -> Result<(Vec<(OperationApproval, User)>, i64), diesel::result::Error> {
+        let approvals_query = operation_approvals::dsl::operation_approvals
+            .filter(operation_approvals::operation_request_id.eq(operation_request_id))
+            .order_by(operation_approvals::dsl::created_at)
+            .inner_join(users::table)
+            .paginate(page)
+            .per_page(limit);
+
+        approvals_query.load_and_count_pages::<(OperationApproval, User)>(conn)
+    }
+
+    pub fn insert(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        new_operation_approval: NewOperationApproval,
+    ) -> Result<OperationApproval, diesel::result::Error> {
+        diesel::insert_into(operation_approvals::dsl::operation_approvals)
+            .values(new_operation_approval)
+            .get_result(conn)
+    }
 }
 
 #[derive(Insertable)]
 #[table_name = "operation_approvals"]
 pub struct NewOperationApproval {
-    pub approver: Uuid,
-    pub request: Uuid,
-    pub kh_signature: String,
+    pub keyholder_id: Uuid,
+    pub operation_request_id: Uuid,
+    pub signature: String,
 }

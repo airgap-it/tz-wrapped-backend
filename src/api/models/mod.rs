@@ -1,7 +1,6 @@
 pub mod common;
-pub mod operations;
-pub mod approvals;
-pub mod pagination;
-pub mod contracts;
-pub mod users;
+pub mod contract;
 pub mod error;
+pub mod operation_approval;
+pub mod operation_request;
+pub mod user;

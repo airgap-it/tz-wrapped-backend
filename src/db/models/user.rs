@@ -4,11 +4,13 @@ use uuid::Uuid;
 
 use crate::api::models::{
     error::APIError,
-    users::{UserKind, UserState},
+    user::{UserKind, UserState},
 };
 use crate::crypto;
 use crate::db::schema::*;
 use crate::tezos;
+
+use super::pagination::Paginate;
 
 #[derive(Queryable, Identifiable, Debug)]
 pub struct User {
@@ -89,6 +91,37 @@ impl User {
             contract_id,
             Some(UserState::Active as i16),
         )
+    }
+
+    pub fn get_list(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        state: Option<UserState>,
+        kind: Option<UserKind>,
+        contract_id: Option<Uuid>,
+        address: Option<&String>,
+        page: i64,
+        limit: i64,
+    ) -> Result<(Vec<User>, i64), diesel::result::Error> {
+        let mut users_query = users::dsl::users
+            .filter(users::dsl::state.eq(state.unwrap_or(UserState::Active) as i16))
+            .order_by(users::dsl::created_at)
+            .into_boxed();
+
+        if let Some(kind) = kind {
+            users_query = users_query.filter(users::dsl::kind.eq(kind as i16));
+        }
+
+        if let Some(contract_id) = contract_id {
+            users_query = users_query.filter(users::dsl::contract_id.eq(contract_id));
+        }
+
+        if let Some(address) = address {
+            users_query = users_query.filter(users::dsl::address.eq(address));
+        }
+
+        let paginated_query = users_query.paginate(page).per_page(limit);
+
+        paginated_query.load_and_count_pages::<User>(&conn)
     }
 
     // TODO: refactor and optimize this method

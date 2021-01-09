@@ -1,26 +1,21 @@
 use std::convert::TryFrom;
 
 use actix_web::{web, web::Path, web::Query, HttpResponse};
-use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
+use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::models::contract::Contract;
-use crate::db::schema::contracts;
+use crate::api::models::{
+    common::ListResponse,
+    contract::{Contract, SignableOperationRequest},
+    error::APIError,
+    operation_request::{NewOperationRequest, OperationRequestKind},
+};
+use crate::db::models::{contract::Contract as DBContract, operation_request::OperationRequest};
 use crate::settings;
 use crate::tezos;
 use crate::tezos::contract::multisig::Multisig;
 use crate::DbPool;
-use crate::{
-    api::models::{
-        common::ListResponse,
-        contracts::{ContractResponse, ContractSignableOperation},
-        error::APIError,
-        operations::{OperationKind, PostOperationRequestBody},
-        pagination::*,
-    },
-    db::models::operation_request::OperationRequest,
-};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -46,17 +41,11 @@ fn load_contracts(
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
     page: i64,
     limit: i64,
-) -> Result<ListResponse<ContractResponse>, APIError> {
-    let contracts_query = contracts::dsl::contracts
-        .order_by(contracts::dsl::created_at)
-        .paginate(page)
-        .per_page(limit);
-
-    let (contracts, total_pages) = contracts_query.load_and_count_pages::<Contract>(&conn)?;
-
+) -> Result<ListResponse<Contract>, APIError> {
+    let (contracts, total_pages) = DBContract::get_list(conn, page, limit)?;
     let contract_responses = contracts
         .into_iter()
-        .map(|contract| ContractResponse::try_from(contract))
+        .map(|contract| Contract::try_from(contract))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(ListResponse {
@@ -78,9 +67,9 @@ pub async fn get_contract(
     let conn = pool.get()?;
     let id = path.id;
 
-    let contract = web::block(move || Contract::get_by_id(&conn, id)).await?;
+    let contract = web::block(move || DBContract::get_by_id(&conn, id)).await?;
 
-    Ok(HttpResponse::Ok().json(ContractResponse::try_from(contract)?))
+    Ok(HttpResponse::Ok().json(Contract::try_from(contract)?))
 }
 
 pub async fn get_contract_nonce(
@@ -92,7 +81,7 @@ pub async fn get_contract_nonce(
     let id = path.id;
 
     let (contract, max_nonce) = web::block::<_, _, APIError>(move || {
-        let contract = Contract::get_by_id(&conn, id)?;
+        let contract = DBContract::get_by_id(&conn, id)?;
         let max_nonce = OperationRequest::max_nonce(&conn, &contract.id)?;
 
         Ok((contract, max_nonce))
@@ -112,7 +101,7 @@ pub async fn get_contract_nonce(
 pub struct SignableInfo {
     target_address: Option<String>,
     amount: i64,
-    kind: OperationKind,
+    kind: OperationRequestKind,
 }
 
 pub async fn get_signable_message(
@@ -124,7 +113,7 @@ pub async fn get_signable_message(
     let conn = pool.get()?;
     let id = path.id;
     let (contract, max_nonce) = web::block::<_, _, APIError>(move || {
-        let contract = Contract::get_by_id(&conn, id)?;
+        let contract = DBContract::get_by_id(&conn, id)?;
         let max_nonce = OperationRequest::max_nonce(&conn, &contract.id).unwrap_or(0);
 
         Ok((contract, max_nonce))
@@ -149,18 +138,18 @@ pub async fn get_signable_message(
     )
     .await?;
 
-    let operation_request = PostOperationRequestBody {
-        destination: contract.id,
+    let operation_request = NewOperationRequest {
+        contract_id: contract.id,
         target_address: query.target_address.clone(),
         amount: query.amount,
         kind: query.kind,
-        gk_signature: "".to_owned(),
+        signature: "".to_owned(),
         chain_id,
         nonce: nonce,
     };
 
-    let response = ContractSignableOperation {
-        operation_request,
+    let response = SignableOperationRequest {
+        unsigned_operation_request: operation_request,
         signable_message: message,
     };
 

@@ -3,20 +3,19 @@ use actix_web::{
     web::{Path, Query},
     HttpResponse,
 };
-use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
+use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::models::{
-    approvals::OperationApprovalResponse, common::ListResponse, error::APIError, pagination::*,
+    common::ListResponse, error::APIError, operation_approval::OperationApproval,
 };
-use crate::db::models::{operation_approval::OperationApproval, user::User};
-use crate::db::schema::{operation_approvals, users};
+use crate::db::models::{operation_approval::OperationApproval as DBOperationApproval, user::User};
 use crate::DbPool;
 
 #[derive(Deserialize)]
 pub struct Info {
-    request_id: Uuid,
+    operation_request_id: Uuid,
     page: Option<i64>,
     limit: Option<i64>,
 }
@@ -31,7 +30,7 @@ pub async fn get_approvals(
 
     let page = query.page.unwrap_or(0);
     let limit = query.limit.unwrap_or(10);
-    let request_id = query.request_id;
+    let request_id = query.operation_request_id;
 
     let result = web::block(move || load_approvals(&conn, request_id, page, limit)).await?;
 
@@ -40,23 +39,15 @@ pub async fn get_approvals(
 
 fn load_approvals(
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
-    request_id: Uuid,
+    operation_request_id: Uuid,
     page: i64,
     limit: i64,
-) -> Result<ListResponse<OperationApprovalResponse>, APIError> {
-    let approvals_query = operation_approvals::dsl::operation_approvals
-        .filter(operation_approvals::request.eq(request_id))
-        .order_by(operation_approvals::dsl::created_at)
-        .inner_join(users::table)
-        .paginate(page)
-        .per_page(limit);
-
+) -> Result<ListResponse<OperationApproval>, APIError> {
     let (operations_with_keyholders, total_pages) =
-        approvals_query.load_and_count_pages::<(OperationApproval, User)>(&conn)?;
-
+        DBOperationApproval::get_list(conn, operation_request_id, page, limit)?;
     let results = operations_with_keyholders
         .into_iter()
-        .map(|approval| OperationApprovalResponse::from(approval.0, approval.1))
+        .map(|approval| OperationApproval::from(approval.0, approval.1))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(ListResponse {
@@ -79,12 +70,12 @@ pub async fn get_approval(
     let id = path.id;
 
     let approval = web::block::<_, _, APIError>(move || {
-        let approval = OperationApproval::get_by_id(&conn, id)?;
-        let keyholder = User::get_by_id(&conn, approval.approver)?;
+        let approval = DBOperationApproval::get_by_id(&conn, id)?;
+        let keyholder = User::get_by_id(&conn, approval.keyholder_id)?;
 
         Ok((approval, keyholder))
     })
     .await?;
 
-    Ok(HttpResponse::Ok().json(OperationApprovalResponse::from(approval.0, approval.1)?))
+    Ok(HttpResponse::Ok().json(OperationApproval::from(approval.0, approval.1)?))
 }

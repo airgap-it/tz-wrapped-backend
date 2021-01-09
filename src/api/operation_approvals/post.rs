@@ -1,45 +1,35 @@
 use std::convert::TryInto;
 
 use actix_web::{web, HttpResponse};
-use diesel::prelude::*;
 use uuid::Uuid;
 
-use crate::{api::models::users::UserKind, tezos::contract::get_signable_message};
-use crate::{
-    api::models::{
-        approvals::{OperationApprovalResponse, PostOperationApprovalBody},
-        error::APIError,
-    },
-    notifications::notify_min_approvals_received,
-    tezos::contract::multisig::Multisig,
+use crate::api::models::user::UserKind;
+use crate::api::models::{
+    error::APIError,
+    operation_approval::{NewOperationApproval, OperationApproval},
 };
-use crate::{
-    crypto,
-    db::models::{
-        operation_approval::OperationApproval,
-        user::{SyncUser, User},
-    },
+use crate::crypto;
+use crate::db::models::{
+    contract::Contract,
+    operation_approval::NewOperationApproval as DBNewOperationApproval,
+    operation_approval::OperationApproval as DBOperationApproval,
+    operation_request::OperationRequest,
+    user::{SyncUser, User},
 };
-use crate::{
-    db::models::{
-        contract::Contract, operation_approval::NewOperationApproval,
-        operation_request::OperationRequest,
-    },
-    DbPool,
-};
-use crate::{
-    db::schema::{contracts, operation_approvals, operation_requests},
-    settings,
-};
+use crate::notifications::notify_min_approvals_received;
+use crate::settings;
+use crate::tezos::contract::get_signable_message;
+use crate::tezos::contract::multisig::Multisig;
+use crate::DbPool;
 
 pub async fn post_approval(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
     contract_settings: web::Data<Vec<settings::Contract>>,
-    body: web::Json<PostOperationApprovalBody>,
+    body: web::Json<NewOperationApproval>,
 ) -> Result<HttpResponse, APIError> {
     let (operation_request, contract) =
-        get_operation_request_and_contract(&pool, body.request).await?;
+        get_operation_request_and_contract(&pool, body.operation_request_id).await?;
 
     let mut multisig = Multisig::new(
         contract.multisig_pkh.as_ref(),
@@ -71,19 +61,20 @@ pub async fn post_approval(
 
     let inserted_approval = store_approval(&pool, keyholder.id, body.into_inner()).await?;
 
-    let result = OperationApprovalResponse::from(inserted_approval, keyholder)?;
+    let result = OperationApproval::from(inserted_approval, keyholder)?;
 
     let request_id = operation_request.id;
-    let mut conn = pool.get()?;
-    let total_approvals = web::block(move || OperationApproval::count(&conn, &request_id)).await?;
+    let conn = pool.get()?;
+    let total_approvals =
+        web::block(move || DBOperationApproval::count(&conn, &request_id)).await?;
 
-    conn = pool.get()?;
+    let conn = pool.get()?;
     if total_approvals >= min_approvals {
         web::block(move || {
             let result = OperationRequest::mark_approved(&conn, &request_id);
 
             if result.is_ok() {
-                let gatekeeper = User::get_by_id(&conn, operation_request.requester);
+                let gatekeeper = User::get_by_id(&conn, operation_request.gatekeeper_id);
                 if let Ok(gatekeeper) = gatekeeper {
                     let _notification_result = notify_min_approvals_received(
                         gatekeeper,
@@ -104,22 +95,17 @@ pub async fn post_approval(
 async fn store_approval(
     pool: &web::Data<DbPool>,
     keyholder_id: Uuid,
-    operation_approval: PostOperationApprovalBody,
-) -> Result<OperationApproval, APIError> {
+    operation_approval: NewOperationApproval,
+) -> Result<DBOperationApproval, APIError> {
     let conn = pool.get()?;
     Ok(web::block::<_, _, diesel::result::Error>(move || {
-        let approval = NewOperationApproval {
-            approver: keyholder_id,
-            request: operation_approval.request,
-            kh_signature: operation_approval.kh_signature,
+        let new_operation_approval = DBNewOperationApproval {
+            keyholder_id,
+            operation_request_id: operation_approval.operation_request_id,
+            signature: operation_approval.signature,
         };
 
-        let inserted_approval: OperationApproval =
-            diesel::insert_into(operation_approvals::dsl::operation_approvals)
-                .values(approval)
-                .get_result(&conn)?;
-
-        Ok(inserted_approval)
+        DBOperationApproval::insert(&conn, new_operation_approval)
     })
     .await?)
 }
@@ -129,7 +115,7 @@ async fn find_and_validate_keyholder<'a>(
     message: String,
     contract: &'a Contract,
     multisig: &'a mut Multisig<'a>,
-    operation_approval: &PostOperationApprovalBody,
+    operation_approval: &NewOperationApproval,
     contract_settings: web::Data<Vec<settings::Contract>>,
 ) -> Result<User, APIError> {
     let keyholder_public_keys = multisig.approvers().await?.to_owned();
@@ -183,7 +169,7 @@ async fn find_and_validate_keyholder<'a>(
 
     let mut result: Result<User, APIError> = Err(APIError::InvalidSignature);
     for kh in keyholders {
-        let is_match = kh.verify_message(&hashed, &operation_approval.kh_signature)?;
+        let is_match = kh.verify_message(&hashed, &operation_approval.signature)?;
         if is_match {
             result = Ok(kh);
             break;
@@ -199,13 +185,9 @@ async fn get_operation_request_and_contract(
 ) -> Result<(OperationRequest, Contract), APIError> {
     let conn = pool.get()?;
 
-    let result: (OperationRequest, Contract) = web::block(move || {
-        operation_requests::dsl::operation_requests
-            .find(operation_request_id)
-            .inner_join(contracts::table)
-            .first(&conn)
-    })
-    .await?;
+    let result: (OperationRequest, Contract) =
+        web::block(move || OperationRequest::get_by_id_with_contract(&conn, &operation_request_id))
+            .await?;
 
     Ok(result)
 }

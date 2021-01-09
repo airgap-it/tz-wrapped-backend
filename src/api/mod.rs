@@ -1,5 +1,5 @@
-pub mod operations;
-pub mod users;
 pub mod contracts;
-pub mod approvals;
 pub mod models;
+pub mod operation_approvals;
+pub mod operation_requests;
+pub mod users;
