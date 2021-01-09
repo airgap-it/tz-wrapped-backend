@@ -12,11 +12,11 @@ use crate::{
     api::models::error::APIError,
     db::models::{contract::Contract, user::User},
 };
-use crate::{api::models::operations::OperationKind, CONFIG};
+use crate::{api::models::operation_request::OperationRequestKind, CONFIG};
 
 pub fn notify_new_operation_request(
     users: Vec<User>,
-    kind: OperationKind,
+    kind: OperationRequestKind,
     contract: Contract,
 ) -> Result<(), APIError> {
     let destinations = users.iter().flat_map(|user| user.email.clone()).collect();
@@ -32,7 +32,7 @@ pub fn notify_new_operation_request(
 
 pub fn notify_min_approvals_received(
     user: User,
-    kind: OperationKind,
+    kind: OperationRequestKind,
     contract: Contract,
 ) -> Result<(), APIError> {
     if let Some(to_email) = user.email {

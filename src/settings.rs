@@ -3,7 +3,7 @@ use std::fmt;
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
-use crate::api::models::contracts::ContractKind;
+use crate::api::models::contract::ContractKind;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Server {

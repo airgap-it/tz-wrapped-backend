@@ -4,12 +4,12 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::db::models::contract;
+use crate::db::models::contract::Contract as DBContract;
 
-use super::{error::APIError, operations::PostOperationRequestBody};
+use super::{error::APIError, operation_request::NewOperationRequest};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ContractResponse {
+pub struct Contract {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -21,11 +21,11 @@ pub struct ContractResponse {
     pub min_approvals: i32,
 }
 
-impl TryFrom<contract::Contract> for ContractResponse {
+impl TryFrom<DBContract> for Contract {
     type Error = APIError;
 
-    fn try_from(value: contract::Contract) -> Result<Self, Self::Error> {
-        Ok(ContractResponse {
+    fn try_from(value: DBContract) -> Result<Self, Self::Error> {
+        Ok(Contract {
             id: value.id,
             created_at: value.created_at,
             updated_at: value.updated_at,
@@ -75,7 +75,7 @@ impl TryFrom<&str> for ContractKind {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ContractSignableOperation {
-    pub operation_request: PostOperationRequestBody,
+pub struct SignableOperationRequest {
+    pub unsigned_operation_request: NewOperationRequest,
     pub signable_message: String,
 }

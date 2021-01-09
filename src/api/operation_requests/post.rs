@@ -1,25 +1,26 @@
 use actix_web::{web, HttpResponse};
-use diesel::{prelude::*, r2d2::ConnectionManager};
-use r2d2::PooledConnection;
+use diesel::{
+    r2d2::{ConnectionManager, PooledConnection},
+    PgConnection,
+};
 
-use crate::db::schema::operation_requests;
 use crate::settings;
 use crate::tezos::contract::get_signable_message;
 use crate::tezos::contract::multisig::Multisig;
 use crate::DbPool;
 use crate::{
     api::models::{
-        error::APIError,
-        operations::OperationRequestResponse,
-        operations::PostOperationRequestBody,
-        users::{UserKind, UserState},
+        error::APIError, operation_request::NewOperationRequest,
+        operation_request::OperationRequest, user::UserKind,
     },
     crypto,
 };
 use crate::{
     db::models::{
         contract::Contract,
-        operation_request::{NewOperationRequest, OperationRequest},
+        operation_request::{
+            NewOperationRequest as DBNewOperationRequest, OperationRequest as DBOperationRequest,
+        },
         user::User,
     },
     notifications::notify_new_operation_request,
@@ -28,10 +29,10 @@ use crate::{
 pub async fn post_operation(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
-    body: web::Json<PostOperationRequestBody>,
+    body: web::Json<NewOperationRequest>,
 ) -> Result<HttpResponse, APIError> {
     let conn = pool.get()?;
-    let contract_id = body.destination;
+    let contract_id = body.contract_id;
     let contract = web::block(move || Contract::get_by_id(&conn, contract_id)).await?;
 
     let multisig = Multisig::new(
@@ -55,13 +56,13 @@ pub async fn post_operation(
         let body = body.into_inner();
         let gatekeeper = find_and_validate_gatekeeper(&conn, &body, message)?;
 
-        let operation = NewOperationRequest {
-            requester: gatekeeper.id,
-            destination: body.destination,
+        let operation = DBNewOperationRequest {
+            gatekeeper_id: gatekeeper.id,
+            contract_id: body.contract_id,
             target_address: body.target_address,
             amount: body.amount,
             kind: body.kind.into(),
-            gk_signature: body.gk_signature,
+            signature: body.signature,
             chain_id: body.chain_id,
             nonce: body.nonce,
         };
@@ -69,7 +70,7 @@ pub async fn post_operation(
         let result = store_operation(&conn, &operation);
 
         if result.is_ok() {
-            let contract = Contract::get_by_id(&conn, body.destination);
+            let contract = Contract::get_by_id(&conn, body.contract_id);
             if let Ok(contract) = contract {
                 let keyholders = User::get_active(&conn, contract.id, UserKind::Keyholder);
                 if let Ok(keyholders) = keyholders {
@@ -88,33 +89,22 @@ pub async fn post_operation(
 
 fn store_operation(
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
-    operation: &NewOperationRequest,
-) -> Result<OperationRequestResponse, APIError> {
-    let inserted_operation: OperationRequest =
-        diesel::insert_into(operation_requests::dsl::operation_requests)
-            .values(operation)
-            .get_result(conn)?;
-
-    let gatekeeper = User::get_by_id(conn, inserted_operation.requester)?;
-
-    let result = OperationRequestResponse::from(inserted_operation, gatekeeper)?;
+    new_operation_request: &DBNewOperationRequest,
+) -> Result<OperationRequest, APIError> {
+    let inserted_operation_request = DBOperationRequest::insert(conn, new_operation_request)?;
+    let gatekeeper = User::get_by_id(conn, inserted_operation_request.gatekeeper_id)?;
+    let result = OperationRequest::from(inserted_operation_request, gatekeeper)?;
 
     Ok(result)
 }
 
 pub fn find_and_validate_gatekeeper(
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
-    operation_request: &PostOperationRequestBody,
+    operation_request: &NewOperationRequest,
     message: String,
 ) -> Result<User, APIError> {
-    use crate::db::schema::users::dsl::*;
-
-    let potential_gatekeepers: Vec<User> = users
-        .filter(contract_id.eq(operation_request.destination))
-        .filter(kind.eq(UserKind::Gatekeeper as i16))
-        .filter(state.eq(UserState::Active as i16))
-        .order_by(created_at)
-        .load(conn)?;
+    let potential_gatekeepers =
+        User::get_active(conn, operation_request.contract_id, UserKind::Gatekeeper)?;
 
     let message_bytes = hex::decode(message).map_err(|_error| APIError::InvalidValue {
         description: String::from("expected valid hex value"),
@@ -126,7 +116,7 @@ pub fn find_and_validate_gatekeeper(
 
     let mut result: Result<User, APIError> = Err(APIError::InvalidSignature);
     for gk in potential_gatekeepers {
-        let is_match = gk.verify_message(&hashed, &operation_request.gk_signature)?;
+        let is_match = gk.verify_message(&hashed, &operation_request.signature)?;
         if is_match {
             result = Ok(gk);
             break;

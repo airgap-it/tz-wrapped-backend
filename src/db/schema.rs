@@ -17,9 +17,9 @@ table! {
         id -> Uuid,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        approver -> Uuid,
-        request -> Uuid,
-        kh_signature -> Varchar,
+        keyholder_id -> Uuid,
+        operation_request_id -> Uuid,
+        signature -> Varchar,
     }
 }
 
@@ -28,12 +28,12 @@ table! {
         id -> Uuid,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        requester -> Uuid,
-        destination -> Uuid,
+        gatekeeper_id -> Uuid,
+        contract_id -> Uuid,
         target_address -> Nullable<Varchar>,
         amount -> Int8,
         kind -> Int2,
-        gk_signature -> Varchar,
+        signature -> Varchar,
         chain_id -> Varchar,
         nonce -> Int8,
         state -> Int2,
@@ -56,10 +56,10 @@ table! {
     }
 }
 
-joinable!(operation_approvals -> operation_requests (request));
-joinable!(operation_approvals -> users (approver));
-joinable!(operation_requests -> contracts (destination));
-joinable!(operation_requests -> users (requester));
+joinable!(operation_approvals -> operation_requests (operation_request_id));
+joinable!(operation_approvals -> users (keyholder_id));
+joinable!(operation_requests -> contracts (contract_id));
+joinable!(operation_requests -> users (gatekeeper_id));
 joinable!(users -> contracts (contract_id));
 
 allow_tables_to_appear_in_same_query!(

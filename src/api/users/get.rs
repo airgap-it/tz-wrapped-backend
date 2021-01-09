@@ -5,18 +5,16 @@ use actix_web::{
     web::{Path, Query},
     HttpResponse,
 };
-use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
+use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::models::{
     common::ListResponse,
     error::APIError,
-    pagination::*,
-    users::{UserKind, UserResponse, UserState},
+    user::{User, UserKind, UserState},
 };
-use crate::db::models::user::User;
-use crate::db::schema::users;
+use crate::db::models::user::User as DBUser;
 use crate::DbPool;
 
 #[derive(Deserialize)]
@@ -62,31 +60,12 @@ fn load_users(
     contract_id: Option<Uuid>,
     state: Option<UserState>,
     address: Option<&String>,
-) -> Result<ListResponse<UserResponse>, APIError> {
-    let mut users_query = users::dsl::users
-        .filter(users::dsl::state.eq(state.unwrap_or(UserState::Active) as i16))
-        .order_by(users::dsl::created_at)
-        .into_boxed();
-
-    if let Some(kind) = kind {
-        users_query = users_query.filter(users::dsl::kind.eq(kind as i16));
-    }
-
-    if let Some(contract_id) = contract_id {
-        users_query = users_query.filter(users::dsl::contract_id.eq(contract_id));
-    }
-
-    if let Some(address) = address {
-        users_query = users_query.filter(users::dsl::address.eq(address));
-    }
-
-    let paginated_query = users_query.paginate(page).per_page(limit);
-
-    let (users, total_pages) = paginated_query.load_and_count_pages::<User>(&conn)?;
-
+) -> Result<ListResponse<User>, APIError> {
+    let (users, total_pages) =
+        DBUser::get_list(conn, state, kind, contract_id, address, page, limit)?;
     let user_responses = users
         .into_iter()
-        .map(|user| UserResponse::try_from(user))
+        .map(|user| User::try_from(user))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(ListResponse {
@@ -109,7 +88,7 @@ pub async fn get_user(
 
     let id = path.id;
 
-    let user = web::block(move || User::get_by_id(&conn, id)).await?;
+    let user = web::block(move || DBUser::get_by_id(&conn, id)).await?;
 
-    Ok(HttpResponse::Ok().json(UserResponse::try_from(user)?))
+    Ok(HttpResponse::Ok().json(User::try_from(user)?))
 }

@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use actix_web::web;
 use chrono::NaiveDateTime;
 use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
@@ -7,6 +5,8 @@ use uuid::Uuid;
 
 use crate::{api::models::error::APIError, db::schema::contracts, DbPool};
 use crate::{settings, tezos::contract::multisig::Multisig};
+
+use super::pagination::Paginate;
 
 #[derive(Queryable, Identifiable, Clone, Debug)]
 pub struct Contract {
@@ -41,6 +41,19 @@ impl Contract {
         Ok(result)
     }
 
+    pub fn get_list(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        page: i64,
+        limit: i64,
+    ) -> Result<(Vec<Contract>, i64), diesel::result::Error> {
+        let contracts_query = contracts::dsl::contracts
+            .order_by(contracts::dsl::created_at)
+            .paginate(page)
+            .per_page(limit);
+
+        contracts_query.load_and_count_pages::<Contract>(&conn)
+    }
+
     // TODO: refactor and optimize this method
     pub async fn sync_contracts(
         pool: &DbPool,
@@ -48,8 +61,8 @@ impl Contract {
         node_url: &str,
     ) -> Result<usize, APIError> {
         let conn = pool.get()?;
-        let stored_contracts = web::block(move || Contract::get_all(&conn)).await?;
 
+        let stored_contracts = web::block(move || Contract::get_all(&conn)).await?;
         let to_remove: Vec<_> = stored_contracts
             .iter()
             .filter(|stored_contract| {
@@ -86,13 +99,14 @@ impl Contract {
         to_add.reserve(new_contracts.len());
         for contract in new_contracts {
             let mut multisig = Multisig::new(&contract.multisig, node_url);
+            let min_approvals = multisig.min_signatures().await? as i32;
             to_add.push(NewContract {
                 pkh: contract.address.clone(),
                 token_id: contract.token_id as i32,
                 multisig_pkh: contract.multisig.clone(),
                 kind: contract.kind as i16,
                 display_name: contract.name.clone(),
-                min_approvals: multisig.min_signatures().await? as i32,
+                min_approvals,
             })
         }
 
