@@ -16,6 +16,11 @@ public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
 name = "Ugly Release"
 email = "m.godenzi@papers.ch"
 
+[[contracts.gatekeepers]]
+public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
+name = "Sudden Push GK"
+email = "m.godenzi@papers.ch"
+
 [[contracts.keyholders]]
 name = "Ugly Release"
 email = "mike@hypergate.com"
@@ -25,5 +30,5 @@ name = "Thrive Umbrella"
 email = "m.godenzi@papers.ch"
 
 [[contracts.keyholders]]
-name = "Sudden Push"
+name = "Sudden Push KH"
 email = "m.godenzi@papers.ch"

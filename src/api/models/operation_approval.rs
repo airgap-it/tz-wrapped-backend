@@ -30,7 +30,7 @@ impl OperationApproval {
             created_at: operation_approval.created_at,
             updated_at: operation_approval.updated_at,
             keyholder: keyholder.try_into()?,
-            operation_request_id: operation_approval.keyholder_id,
+            operation_request_id: operation_approval.operation_request_id,
             signature: operation_approval.signature,
         })
     }
