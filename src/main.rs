@@ -70,10 +70,6 @@ async fn main() -> std::io::Result<()> {
         &mut std::io::stdout(),
     );
 
-    println!("SMPT HOST: {}", CONFIG.smtp.host);
-    println!("SMPT PORT: {}", CONFIG.smtp.port);
-    println!("SMPT USER: {}", CONFIG.smtp.user);
-
     sync_db(&pool)
         .await
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
