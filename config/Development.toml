@@ -7,6 +7,7 @@ multisig = "KT1BYMvJoM75JyqFbsLKouqkAv8dgEvViioP"
 name = "tzBTC"
 kind = "fa1"
 token_id = 0
+decimals = 8
 
 [[contracts.gatekeepers]]
 public_key = "edpkvVL8vEq7PTm7mbTyomvA3h6RNsJTKt213WN2Z4Zt87cQommPZ3"

@@ -1,12 +1,11 @@
 use std::convert::{TryFrom, TryInto};
 
-use derive_more::{Display, Error};
 use primitive::Primitive;
 use serde::{Deserialize, Serialize};
 
-use super::coding;
 use super::utils;
 use super::utils::ConsumableHexStr;
+use super::{coding, TzError};
 
 pub mod data;
 pub mod instructions;
@@ -42,143 +41,6 @@ pub enum MichelsonV1Expression {
 static PACK_PREFIX: &str = "05";
 
 impl MichelsonV1Expression {
-    pub fn prepare_call<'a>(
-        &self,
-        entrypoint: &str,
-        argument_bindings: &mut Vec<ArgsBinding<'a>>,
-    ) -> Result<MichelsonV1Expression, TzError> {
-        todo!()
-    }
-
-    pub fn find_entrypoint(
-        &self,
-        entrypoint: &str,
-    ) -> Result<Option<MichelsonV1Expression>, TzError> {
-        let (type_, args, annots) = self.type_info()?;
-        if let Some(annots) = annots {
-            let annot = format!("%{}", entrypoint);
-            if annots.contains(&annot) {
-                return Ok(Some(self.clone()));
-            }
-        }
-        match type_ {
-            primitive::Type::Or => {
-                if let Some(args) = args {
-                    if args.len() != 2 {
-                        return Err(TzError::InvalidType);
-                    }
-                    let found_left = args.first().unwrap().find_entrypoint(entrypoint)?;
-                    if let Some(left) = found_left {
-                        return Ok(Some(data::left(left)));
-                    }
-                    let found_right = args.last().unwrap().find_entrypoint(entrypoint)?;
-                    if let Some(right) = found_right {
-                        return Ok(Some(data::right(right)));
-                    }
-                    Ok(None)
-                } else {
-                    Err(TzError::InvalidType)
-                }
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn apply_bindings<'a>(
-        &self,
-        argument_bindings: &mut Vec<ArgsBinding<'a>>,
-    ) -> Result<MichelsonV1Expression, TzError> {
-        use primitive::Type;
-
-        let (type_, argument_types, annots) = self.type_info()?;
-        let mut binding: Option<ArgsBinding<'a>> = None;
-        if let Some(annots) = annots {
-            for annot in annots.iter() {
-                let found = argument_bindings.iter().position(|arg| {
-                    arg.label
-                        == Some(if annot.len() > 1 {
-                            annot[1..].as_ref()
-                        } else {
-                            annot
-                        })
-                });
-                if let Some(index) = found {
-                    binding = Some(argument_bindings.remove(index));
-                    break;
-                }
-            }
-        }
-        match type_ {
-            Type::Bool => binding
-                .or_else(|| {
-                    if !argument_bindings.is_empty() {
-                        Some(argument_bindings.remove(0))
-                    } else {
-                        None
-                    }
-                })
-                .and_then(|binding| match binding.value {
-                    Args::Expr(value) => Some(Ok(value.clone())),
-                    _ => Some(Err(TzError::InvalidType)),
-                })
-                .unwrap_or(Err(TzError::InvalidType)),
-            Type::Contract
-            | Type::Key
-            | Type::KeyHash
-            | Type::Signature
-            | Type::Address
-            | Type::ChainID => binding
-                .or_else(|| {
-                    if !argument_bindings.is_empty() {
-                        Some(argument_bindings.remove(0))
-                    } else {
-                        None
-                    }
-                })
-                .and_then(|binding| match binding.value {
-                    Args::Expr(value) => Some(Ok(value.clone())),
-                    _ => Some(Err(TzError::InvalidType)),
-                })
-                .unwrap_or(Err(TzError::InvalidType)),
-            Type::Int | Type::Mutez | Type::Nat => todo!(),
-            Type::List | Type::Set => {
-                if let Some(argument_types) = argument_types {
-                    if argument_types.len() != 1 {
-                        return Err(TzError::InvalidType);
-                    }
-                    todo!()
-                }
-                Err(TzError::InvalidType)
-            }
-            Type::Map | Type::BigMap => Err(TzError::InvalidType),
-            Type::Option => todo!(),
-            Type::Or => Err(TzError::InvalidType),
-            Type::Pair => {
-                if let Some(arguments) = argument_types {
-                    if arguments.len() != 2 {
-                        return Err(TzError::InvalidType);
-                    }
-                    let first = arguments
-                        .first()
-                        .unwrap()
-                        .apply_bindings(argument_bindings)?;
-                    let second = arguments
-                        .last()
-                        .unwrap()
-                        .apply_bindings(argument_bindings)?;
-                    return Ok(data::pair(first, second));
-                }
-                Err(TzError::InvalidType)
-            }
-            Type::String => todo!(),
-            Type::Bytes => todo!(),
-            Type::Timestamp => todo!(),
-            Type::Unit => Ok(data::unit()),
-            Type::Lambda => todo!(),
-            _ => return Err(TzError::InvalidType),
-        }
-    }
-
     pub fn pack(&self, schema: Option<&MichelsonV1Expression>) -> Result<String, TzError> {
         let encoded: String;
         if let Some(schema) = schema {
@@ -191,7 +53,10 @@ impl MichelsonV1Expression {
         Ok(format!("{}{}", PACK_PREFIX, encoded))
     }
 
-    fn prepack(&self, schema: &MichelsonV1Expression) -> Result<MichelsonV1Expression, TzError> {
+    pub fn prepack(
+        &self,
+        schema: &MichelsonV1Expression,
+    ) -> Result<MichelsonV1Expression, TzError> {
         use primitive::Type;
         let (type_, args, _) = schema.type_info()?;
         let string_value =
@@ -601,6 +466,20 @@ pub fn extract_string(value: &MichelsonV1Expression) -> Result<&String, TzError>
     }
 }
 
+pub fn extract_key(value: &MichelsonV1Expression) -> Result<&MichelsonV1Expression, TzError> {
+    let elt = extract_prim(value)?;
+    match elt.prim {
+        Primitive::Data(primitive::Data::Elt) => {
+            if elt.args_count() == 2 {
+                Ok(elt.args.as_ref().unwrap().first().as_ref().unwrap())
+            } else {
+                Err(TzError::InvalidType)
+            }
+        }
+        _ => Err(TzError::InvalidType),
+    }
+}
+
 pub fn extract_sequence(
     value: &MichelsonV1Expression,
 ) -> Result<&Vec<MichelsonV1Expression>, TzError> {
@@ -608,21 +487,6 @@ pub fn extract_sequence(
         Ok(value)
     } else {
         Err(TzError::InvalidType)
-    }
-}
-
-#[derive(Error, Display, Debug)]
-pub enum TzError {
-    InvalidIndex,
-    InvalidType,
-    InvalidArgument,
-    NetworkFailure,
-    ParsingFailure,
-}
-
-impl From<serde_json::Error> for TzError {
-    fn from(_: serde_json::Error) -> Self {
-        TzError::ParsingFailure
     }
 }
 

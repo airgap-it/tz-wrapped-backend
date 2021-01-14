@@ -75,3 +75,14 @@ pub fn operation() -> MichelsonV1Expression {
 pub fn mutez() -> MichelsonV1Expression {
     prim(Type::Mutez, None)
 }
+
+pub fn lambda(
+    parameter: MichelsonV1Expression,
+    return_type: MichelsonV1Expression,
+) -> MichelsonV1Expression {
+    prim(Type::Lambda, Some(vec![parameter, return_type]))
+}
+
+pub fn unit() -> MichelsonV1Expression {
+    prim(Type::Unit, None)
+}

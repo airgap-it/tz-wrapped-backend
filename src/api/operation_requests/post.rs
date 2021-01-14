@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use actix_web::{web, HttpResponse};
 use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
@@ -5,8 +7,7 @@ use diesel::{
 };
 
 use crate::settings;
-use crate::tezos::contract::get_signable_message;
-use crate::tezos::contract::multisig::Multisig;
+use crate::tezos::contract::{get_signable_message, multisig};
 use crate::DbPool;
 use crate::{
     api::models::{
@@ -35,8 +36,9 @@ pub async fn post_operation(
     let contract_id = body.contract_id;
     let contract = web::block(move || Contract::get_by_id(&conn, contract_id)).await?;
 
-    let multisig = Multisig::new(
+    let multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
+        contract.kind.try_into()?,
         tezos_settings.node_url.as_ref(),
     );
 

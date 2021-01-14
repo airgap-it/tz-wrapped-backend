@@ -4,24 +4,41 @@ pub mod micheline;
 pub mod utils;
 
 use base58check::{FromBase58Check, ToBase58Check};
-use micheline::TzError;
+use derive_more::{Display, Error};
 use sodiumoxide::crypto::sign;
 
-use crate::{api::models::error::APIError, crypto};
+use crate::crypto;
 
-pub fn edsig_to_bytes(signature: &str) -> Result<[u8; sign::SIGNATUREBYTES], APIError> {
+#[derive(Error, Display, Debug)]
+pub enum TzError {
+    InvalidIndex,
+    InvalidType,
+    InvalidArgument,
+    NetworkFailure,
+    ParsingFailure,
+    InvalidPublicKey,
+    InvalidSignature,
+}
+
+impl From<serde_json::Error> for TzError {
+    fn from(_: serde_json::Error) -> Self {
+        TzError::ParsingFailure
+    }
+}
+
+pub fn edsig_to_bytes(signature: &str) -> Result<[u8; sign::SIGNATUREBYTES], TzError> {
     if !signature.starts_with("edsig") {
-        return Err(APIError::InvalidSignature);
+        return Err(TzError::InvalidSignature);
     }
 
     let (_version, decoded) = signature
         .from_base58check()
-        .map_err(|_error| APIError::InvalidSignature)?;
+        .map_err(|_error| TzError::InvalidSignature)?;
 
     let decode_without_prefix = &decoded[4..];
 
     if decode_without_prefix.len() != sign::SIGNATUREBYTES {
-        return Err(APIError::InvalidSignature);
+        return Err(TzError::InvalidSignature);
     }
 
     let mut result: [u8; sign::SIGNATUREBYTES] = [0; sign::SIGNATUREBYTES];
@@ -30,19 +47,19 @@ pub fn edsig_to_bytes(signature: &str) -> Result<[u8; sign::SIGNATUREBYTES], API
     Ok(result)
 }
 
-pub fn edpk_to_bytes(pk: &str) -> Result<[u8; sign::PUBLICKEYBYTES], APIError> {
+pub fn edpk_to_bytes(pk: &str) -> Result<[u8; sign::PUBLICKEYBYTES], TzError> {
     if !pk.starts_with("edpk") {
-        return Err(APIError::InvalidPublicKey);
+        return Err(TzError::InvalidPublicKey);
     }
 
     let (_version, decoded) = pk
         .from_base58check()
-        .map_err(|_error| APIError::InvalidPublicKey)?;
+        .map_err(|_error| TzError::InvalidPublicKey)?;
 
     let decode_without_prefix = &decoded[3..];
 
     if decode_without_prefix.len() != sign::PUBLICKEYBYTES {
-        return Err(APIError::InvalidPublicKey);
+        return Err(TzError::InvalidPublicKey);
     }
 
     let mut result: [u8; sign::PUBLICKEYBYTES] = [0; sign::PUBLICKEYBYTES];
@@ -51,7 +68,7 @@ pub fn edpk_to_bytes(pk: &str) -> Result<[u8; sign::PUBLICKEYBYTES], APIError> {
     Ok(result)
 }
 
-pub fn edpk_to_tz1(pk: &str) -> Result<String, APIError> {
+pub fn edpk_to_tz1(pk: &str) -> Result<String, TzError> {
     let pk_bytes = edpk_to_bytes(pk)?;
 
     let hash = crypto::generic_hash(&pk_bytes, 20).map_err(|_error| TzError::InvalidArgument)?;

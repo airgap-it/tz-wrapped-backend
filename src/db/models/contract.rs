@@ -3,10 +3,12 @@ use chrono::NaiveDateTime;
 use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
 use uuid::Uuid;
 
-use crate::{api::models::error::APIError, db::schema::contracts, DbPool};
-use crate::{settings, tezos::contract::multisig::Multisig};
-
 use super::pagination::Paginate;
+use crate::api::models::error::APIError;
+use crate::db::schema::contracts;
+use crate::settings;
+use crate::tezos::contract::multisig;
+use crate::DbPool;
 
 #[derive(Queryable, Identifiable, Clone, Debug)]
 pub struct Contract {
@@ -19,6 +21,7 @@ pub struct Contract {
     pub kind: i16,
     pub display_name: String,
     pub min_approvals: i32,
+    pub decimals: i32,
 }
 
 impl Contract {
@@ -98,7 +101,7 @@ impl Contract {
         let mut to_add = Vec::<NewContract>::new();
         to_add.reserve(new_contracts.len());
         for contract in new_contracts {
-            let mut multisig = Multisig::new(&contract.multisig, node_url);
+            let mut multisig = multisig::get_multisig(&contract.multisig, contract.kind, node_url);
             let min_approvals = multisig.min_signatures().await? as i32;
             to_add.push(NewContract {
                 pkh: contract.address.clone(),
@@ -107,6 +110,7 @@ impl Contract {
                 kind: contract.kind as i16,
                 display_name: contract.name.clone(),
                 min_approvals,
+                decimals: contract.decimals,
             })
         }
 
@@ -118,12 +122,14 @@ impl Contract {
             });
 
             if let Some(stored_contract) = found {
-                let mut multisig = Multisig::new(&contract.multisig, node_url);
+                let mut multisig =
+                    multisig::get_multisig(&contract.multisig, contract.kind, node_url);
                 let min_approvals = multisig.min_signatures().await? as i32;
                 let has_changes = stored_contract.multisig_pkh != contract.multisig
                     || stored_contract.display_name != contract.name
                     || stored_contract.kind != (contract.kind as i16)
-                    || stored_contract.min_approvals != min_approvals;
+                    || stored_contract.min_approvals != min_approvals
+                    || stored_contract.decimals != contract.decimals;
                 if has_changes {
                     to_update.push(UpdateContract {
                         id: stored_contract.id,
@@ -182,6 +188,7 @@ pub struct NewContract {
     pub kind: i16,
     pub display_name: String,
     pub min_approvals: i32,
+    pub decimals: i32,
 }
 
 impl NewContract {

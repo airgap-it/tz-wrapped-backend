@@ -130,10 +130,14 @@ impl From<r2d2::Error> for APIError {
     }
 }
 
-impl From<tezos::micheline::TzError> for APIError {
-    fn from(value: tezos::micheline::TzError) -> Self {
-        APIError::Internal {
-            description: value.to_string(),
+impl From<tezos::TzError> for APIError {
+    fn from(value: tezos::TzError) -> Self {
+        match value {
+            tezos::TzError::InvalidPublicKey => APIError::InvalidPublicKey,
+            tezos::TzError::InvalidSignature => APIError::InvalidSignature,
+            _ => APIError::Internal {
+                description: value.to_string(),
+            },
         }
     }
 }

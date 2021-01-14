@@ -18,11 +18,9 @@ use crate::db::models::{
     contract::Contract, operation_request::OperationRequest as DBOperationRequest, user::User,
 };
 use crate::settings;
-use crate::tezos::{
-    self,
-    contract::multisig::Multisig,
-    contract::{contract_call_for, multisig::Signature},
-};
+use crate::tezos;
+use crate::tezos::contract::multisig;
+use crate::tezos::contract::{contract_call_for, multisig::Signature};
 use crate::DbPool;
 
 #[derive(Deserialize)]
@@ -119,8 +117,9 @@ pub async fn get_signable_message(
     let id = path.id;
     let (operation, contract) = load_operation_and_contract(&pool, &id).await?;
 
-    let multisig = Multisig::new(
+    let multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
+        contract.kind.try_into()?,
         tezos_settings.node_url.as_ref(),
     );
 
@@ -160,8 +159,9 @@ pub async fn get_operation_request_parameters(
     })
     .await?;
 
-    let mut multisig = Multisig::new(
+    let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
+        contract.kind.try_into()?,
         tezos_settings.node_url.as_ref(),
     );
     let call = contract_call_for(

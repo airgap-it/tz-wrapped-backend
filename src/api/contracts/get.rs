@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use actix_web::{web, web::Path, web::Query, HttpResponse};
 use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
@@ -14,7 +14,7 @@ use crate::api::models::{
 use crate::db::models::{contract::Contract as DBContract, operation_request::OperationRequest};
 use crate::settings;
 use crate::tezos;
-use crate::tezos::contract::multisig::Multisig;
+use crate::tezos::contract::multisig;
 use crate::DbPool;
 
 #[derive(Deserialize)]
@@ -87,8 +87,9 @@ pub async fn get_contract_nonce(
         Ok((contract, max_nonce))
     })
     .await?;
-    let mut multisig = Multisig::new(
+    let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
+        contract.kind.try_into()?,
         tezos_settings.node_url.as_ref(),
     );
 
@@ -114,13 +115,14 @@ pub async fn get_signable_message(
     let id = path.id;
     let (contract, max_nonce) = web::block::<_, _, APIError>(move || {
         let contract = DBContract::get_by_id(&conn, id)?;
-        let max_nonce = OperationRequest::max_nonce(&conn, &contract.id).unwrap_or(0);
+        let max_nonce = OperationRequest::max_nonce(&conn, &contract.id).unwrap_or(-1);
 
         Ok((contract, max_nonce))
     })
     .await?;
-    let mut multisig = Multisig::new(
+    let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
+        contract.kind.try_into()?,
         tezos_settings.node_url.as_ref(),
     );
 

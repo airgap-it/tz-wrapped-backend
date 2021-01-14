@@ -30,6 +30,7 @@ lazy_static = "1.4.0"
 lettre = "0.9"
 lettre_email = "0.9"
 native-tls = "0.2"
+async-trait = "0.1.42"
 
 [dev-dependencies]
 actix-rt = "*"
