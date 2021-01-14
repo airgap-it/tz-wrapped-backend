@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
-use multisig::Multisig;
-
+use self::multisig::Multisig;
+use super::micheline::MichelsonV1Expression;
 use crate::{
     api::models::{
         contract::ContractKind, error::APIError, operation_request::OperationRequestKind,
@@ -9,20 +9,18 @@ use crate::{
     db::models::contract::Contract,
 };
 
-use super::micheline::MichelsonV1Expression;
-
 pub mod fa1;
 pub mod fa2;
 pub mod multisig;
 
-pub async fn get_signable_message<'a>(
-    contract: &'a Contract,
+pub async fn get_signable_message(
+    contract: &Contract,
     operation_kind: OperationRequestKind,
     target_address: Option<&String>,
     amount: i64,
     nonce: i64,
     chain_id: &str,
-    multisig: &Multisig<'a>,
+    multisig: &Box<dyn Multisig + '_>,
 ) -> Result<String, APIError> {
     let call = contract_call_for(contract, operation_kind, target_address, amount)?;
     let message = multisig
@@ -32,8 +30,8 @@ pub async fn get_signable_message<'a>(
     Ok(message)
 }
 
-pub fn contract_call_for<'a>(
-    contract: &'a Contract,
+pub fn contract_call_for(
+    contract: &Contract,
     operation_kind: OperationRequestKind,
     target_address: Option<&String>,
     amount: i64,

@@ -1,4 +1,4 @@
-use super::micheline::TzError;
+use super::TzError;
 use base58check::{FromBase58Check, ToBase58Check};
 use chrono::DateTime;
 

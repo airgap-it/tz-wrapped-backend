@@ -41,6 +41,7 @@ pub struct Contract {
     pub token_id: i64,
     pub gatekeepers: Vec<Gatekeeper>,
     pub keyholders: Vec<Keyholder>,
+    pub decimals: i32,
 }
 
 #[derive(Debug, Deserialize, Clone)]

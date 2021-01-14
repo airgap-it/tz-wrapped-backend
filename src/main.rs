@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+use std::convert::TryInto;
+
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer, Responder};
 
@@ -140,8 +142,9 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
     }
 
     for contract in stored_contracts {
-        let mut multisig = tezos::contract::multisig::Multisig::new(
+        let mut multisig = tezos::contract::multisig::get_multisig(
             contract.multisig_pkh.as_ref(),
+            contract.kind.try_into()?,
             CONFIG.tezos.node_url.as_ref(),
         );
 

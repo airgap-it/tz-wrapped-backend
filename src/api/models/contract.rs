@@ -19,6 +19,7 @@ pub struct Contract {
     pub kind: ContractKind,
     pub display_name: String,
     pub min_approvals: i32,
+    pub decimals: i32,
 }
 
 impl TryFrom<DBContract> for Contract {
@@ -35,6 +36,7 @@ impl TryFrom<DBContract> for Contract {
             kind: ContractKind::try_from(value.kind)?,
             display_name: value.display_name,
             min_approvals: value.min_approvals,
+            decimals: value.decimals,
         })
     }
 }

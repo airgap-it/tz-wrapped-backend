@@ -9,6 +9,7 @@ table! {
         kind -> Int2,
         display_name -> Varchar,
         min_approvals -> Int4,
+        decimals -> Int4,
     }
 }
 

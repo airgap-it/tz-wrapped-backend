@@ -18,8 +18,7 @@ use crate::db::models::{
 };
 use crate::notifications::notify_min_approvals_received;
 use crate::settings;
-use crate::tezos::contract::get_signable_message;
-use crate::tezos::contract::multisig::Multisig;
+use crate::tezos::contract::{get_signable_message, multisig, multisig::Multisig};
 use crate::DbPool;
 
 pub async fn post_approval(
@@ -31,8 +30,9 @@ pub async fn post_approval(
     let (operation_request, contract) =
         get_operation_request_and_contract(&pool, body.operation_request_id).await?;
 
-    let mut multisig = Multisig::new(
+    let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
+        contract.kind.try_into()?,
         tezos_settings.node_url.as_ref(),
     );
 
@@ -53,7 +53,7 @@ pub async fn post_approval(
         &pool,
         message,
         &contract,
-        &mut multisig,
+        multisig,
         &body,
         contract_settings,
     )
@@ -110,11 +110,11 @@ async fn store_approval(
     .await?)
 }
 
-async fn find_and_validate_keyholder<'a>(
+async fn find_and_validate_keyholder(
     pool: &web::Data<DbPool>,
     message: String,
-    contract: &'a Contract,
-    multisig: &'a mut Multisig<'a>,
+    contract: &Contract,
+    mut multisig: Box<dyn Multisig + '_>,
     operation_approval: &NewOperationApproval,
     contract_settings: web::Data<Vec<settings::Contract>>,
 ) -> Result<User, APIError> {

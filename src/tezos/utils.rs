@@ -1,7 +1,7 @@
 use radix_fmt;
 use std::fmt::Display;
 
-use super::micheline::TzError;
+use super::TzError;
 
 pub fn num_to_padded_str<T>(value: T, length: Option<usize>, radix: Option<u8>) -> String
 where
