@@ -110,6 +110,7 @@ pub enum Instruction {
     EmptySet = 0x24,
     Eq = 0x25,
     Exec = 0x26,
+    #[serde(rename = "FAILWITH")]
     FailWith = 0x27,
     Ge = 0x28,
     Get = 0x29,
