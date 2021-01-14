@@ -30,3 +30,33 @@ email = "m.godenzi@papers.ch"
 [[contracts.keyholders]]
 name = "Swiss Crypto Tokens"
 email = "m.godenzi@papers.ch"
+
+[[contracts]]
+address = "KT1S4QXjASmM3ei7a6raRLkr4TbnKu7RuC9X"
+multisig = "KT1TD6buzFQbLLYfx92UpZ6N2jfCaat3GSrN"
+name = "tzETH"
+kind = "fa2"
+token_id = 0
+decimals = 18
+
+[[contracts.gatekeepers]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+name = "Ugly Release"
+email = "m.godenzi@papers.ch"
+
+[[contracts.gatekeepers]]
+public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
+name = "Sudden Push"
+email = "m.godenzi@papers.ch"
+
+[[contracts.keyholders]]
+name = "Alice"
+email = "mike@hypergate.com"
+
+[[contracts.keyholders]]
+name = "Robert"
+email = "m.godenzi@papers.ch"
+
+[[contracts.keyholders]]
+name = "Dan"
+email = "m.godenzi@papers.ch"

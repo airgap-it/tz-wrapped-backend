@@ -49,7 +49,7 @@ email = "m.godenzi@papers.ch"
 
 [[contracts.gatekeepers]]
 public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
-name = "Sudden Push GK"
+name = "Sudden Push"
 email = "m.godenzi@papers.ch"
 
 [[contracts.keyholders]]
