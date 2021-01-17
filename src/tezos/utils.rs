@@ -1,3 +1,5 @@
+use num_bigint::BigUint;
+use num_traits::ToPrimitive;
 use radix_fmt;
 use std::fmt::Display;
 
@@ -63,6 +65,11 @@ impl<'a> ConsumableHexStr<'a> {
 
         Ok(&self.str[self.position..index])
     }
+}
+
+pub fn biguint_to_u8(a: &BigUint) -> u8 {
+    let mask = BigUint::from(u8::MAX);
+    (a & mask).to_u8().unwrap()
 }
 
 #[cfg(test)]

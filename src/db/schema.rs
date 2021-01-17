@@ -32,7 +32,7 @@ table! {
         gatekeeper_id -> Uuid,
         contract_id -> Uuid,
         target_address -> Nullable<Varchar>,
-        amount -> Int8,
+        amount -> Numeric,
         kind -> Int2,
         signature -> Varchar,
         chain_id -> Varchar,

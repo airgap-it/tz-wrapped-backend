@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS operation_requests (
     gatekeeper_id       uuid NOT NULL,
     contract_id         uuid NOT NULL,
     target_address      VARCHAR DEFAULT NULL,
-    amount              BIGINT NOT NULL,
+    amount              NUMERIC(1000, 0) NOT NULL,
     kind                SMALLINT NOT NULL,
     signature           VARCHAR NOT NULL,
     chain_id            VARCHAR NOT NULL,

@@ -1,3 +1,4 @@
+use bigdecimal::BigDecimal;
 use chrono::NaiveDateTime;
 use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
 use uuid::Uuid;
@@ -20,7 +21,7 @@ pub struct OperationRequest {
     pub gatekeeper_id: Uuid,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: i64,
+    pub amount: BigDecimal,
     pub kind: i16,
     pub signature: String,
     pub chain_id: String,
@@ -111,18 +112,24 @@ impl OperationRequest {
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         kind: OperationRequestKind,
         contract_id: Uuid,
+        state: Option<OperationRequestState>,
         page: i64,
         limit: i64,
     ) -> Result<(Vec<(OperationRequest, User)>, i64), diesel::result::Error> {
-        let operations_query = operation_requests::dsl::operation_requests
+        let mut query = operation_requests::dsl::operation_requests
             .filter(operation_requests::dsl::kind.eq(kind as i16))
             .filter(operation_requests::dsl::contract_id.eq(contract_id))
             .order_by(operation_requests::dsl::created_at)
             .inner_join(users::table)
-            .paginate(page)
-            .per_page(limit);
+            .into_boxed();
 
-        operations_query.load_and_count_pages::<(OperationRequest, User)>(&conn)
+        if let Some(state) = state {
+            query = query.filter(operation_requests::dsl::state.eq(state as i16));
+        }
+
+        let query = query.paginate(page).per_page(limit);
+
+        query.load_and_count_pages::<(OperationRequest, User)>(&conn)
     }
 }
 
@@ -132,7 +139,7 @@ pub struct NewOperationRequest {
     pub gatekeeper_id: Uuid,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: i64,
+    pub amount: BigDecimal,
     pub kind: i16,
     pub signature: String,
     pub chain_id: String,

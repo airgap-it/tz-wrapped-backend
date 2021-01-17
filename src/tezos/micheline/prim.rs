@@ -1,10 +1,10 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 
 use super::{
     super::utils,
-    primitive::{Primitive, Type},
+    primitive::{Instruction, Primitive, Type},
     HexDecodable, HexEncodable, MichelsonV1Expression, TzError,
 };
 
@@ -61,7 +61,7 @@ impl Prim {
                     encoded_string
                 )
             }
-            None => String::from(""),
+            None => "".into(),
         }
     }
 
@@ -78,6 +78,191 @@ impl Prim {
             None => 0,
         }
     }
+
+    pub fn prepack_instruction(&self) -> Result<Prim, TzError> {
+        match self.prim {
+            Primitive::Instruction(instruction) => match instruction {
+                Instruction::Dip => self.prepack_dip_instruction(),
+                Instruction::If
+                | Instruction::IfCons
+                | Instruction::IfLeft
+                | Instruction::IfNone => self.prepack_if_instructions(),
+                Instruction::Lambda => self.prepack_lambda_instruction(),
+                Instruction::Loop
+                | Instruction::LoopLeft
+                | Instruction::Map
+                | Instruction::Iter => self.prepack_iteration_instructions(),
+                Instruction::Push => self.prepack_push_instruction(),
+                _ => Ok(self.clone()),
+            },
+            _ => Err(TzError::InvalidType),
+        }
+    }
+
+    fn prepack_dip_instruction(&self) -> Result<Prim, TzError> {
+        match self.args_count() {
+            1 => Ok(Prim::new(
+                self.prim,
+                Some(vec![self
+                    .args
+                    .as_ref()
+                    .unwrap()
+                    .first()
+                    .unwrap()
+                    .prepack_lambda()?]),
+                self.annots.clone(),
+            )),
+            2 => Ok(Prim::new(
+                self.prim,
+                Some(vec![
+                    self.args.as_ref().unwrap().first().unwrap().clone(),
+                    self.args
+                        .as_ref()
+                        .unwrap()
+                        .last()
+                        .unwrap()
+                        .prepack_lambda()?,
+                ]),
+                self.annots.clone(),
+            )),
+            _ => Err(TzError::InvalidType),
+        }
+    }
+
+    fn prepack_if_instructions(&self) -> Result<Prim, TzError> {
+        if self.args_count() != 2 {
+            return Err(TzError::InvalidType);
+        }
+
+        Ok(Prim::new(
+            self.prim,
+            Some(vec![
+                self.args
+                    .as_ref()
+                    .unwrap()
+                    .first()
+                    .unwrap()
+                    .prepack_lambda()?,
+                self.args
+                    .as_ref()
+                    .unwrap()
+                    .last()
+                    .unwrap()
+                    .prepack_lambda()?,
+            ]),
+            self.annots.clone(),
+        ))
+    }
+
+    fn prepack_lambda_instruction(&self) -> Result<Prim, TzError> {
+        if self.args_count() != 3 {
+            return Err(TzError::InvalidType);
+        }
+
+        Ok(Prim::new(
+            self.prim,
+            Some(vec![
+                self.args.as_ref().unwrap().first().unwrap().clone(),
+                self.args.as_ref().unwrap()[1].clone(),
+                self.args
+                    .as_ref()
+                    .unwrap()
+                    .last()
+                    .unwrap()
+                    .prepack_lambda()?,
+            ]),
+            self.annots.clone(),
+        ))
+    }
+
+    fn prepack_iteration_instructions(&self) -> Result<Prim, TzError> {
+        if self.args_count() != 1 {
+            return Err(TzError::InvalidType);
+        }
+
+        Ok(Prim::new(
+            self.prim,
+            Some(vec![self
+                .args
+                .as_ref()
+                .unwrap()
+                .first()
+                .unwrap()
+                .prepack_lambda()?]),
+            self.annots.clone(),
+        ))
+    }
+
+    fn prepack_push_instruction(&self) -> Result<Prim, TzError> {
+        if self.args_count() != 2 {
+            return Err(TzError::InvalidType);
+        }
+
+        let schema = self.args.as_ref().unwrap().first().unwrap();
+        let data = self.args.as_ref().unwrap().last().unwrap();
+
+        Ok(Prim::new(
+            self.prim,
+            Some(vec![schema.clone(), data.prepack(schema)?]),
+            self.annots.clone(),
+        ))
+    }
+}
+
+impl Display for Prim {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let to_michelson = |name: String| -> String {
+            if let Some(args) = self.args.as_ref() {
+                let mut michelson = format!("({} ", name.trim_matches('"'));
+                for (index, arg) in args.iter().enumerate() {
+                    michelson = format!(
+                        "{}{}{}",
+                        michelson,
+                        arg,
+                        if index == args.len() - 1 { ")" } else { " " }
+                    )
+                }
+
+                michelson
+            } else {
+                name.trim_matches('"').to_owned()
+            }
+        };
+
+        let value = match self.prim {
+            Primitive::Data(data) => {
+                let name = serde_json::json!(data).to_string();
+                to_michelson(name)
+            }
+            Primitive::Type(type_) => {
+                let name = serde_json::json!(type_).to_string();
+                to_michelson(name)
+            }
+            Primitive::Instruction(instruction) => {
+                let name = serde_json::json!(instruction)
+                    .to_string()
+                    .trim_matches('"')
+                    .to_owned();
+                if let Some(args) = self.args.as_ref() {
+                    let mut michelson = format!("{} ", name);
+                    for (index, arg) in args.iter().enumerate() {
+                        michelson = format!(
+                            "{}{}{}",
+                            michelson,
+                            arg,
+                            if index != args.len() - 1 { " " } else { "" }
+                        )
+                    }
+
+                    michelson
+                } else {
+                    name
+                }
+            }
+        };
+
+        write!(f, "{}", value)
+    }
 }
 
 impl HexEncodable for Prim {
@@ -86,9 +271,9 @@ impl HexEncodable for Prim {
         let has_annots = self.has_annots();
         let prefix = MessagePrefix::new(args_count, has_annots)?;
         let op = self.prim.op_code();
-        let mut encoded_args = match &self.args {
+        let mut encoded_args: String = match &self.args {
             Some(vec) => vec.iter().map(|arg| arg.to_hex_encoded()).collect(),
-            None => Ok(String::from("")),
+            None => Ok("".into()),
         }?;
         if prefix == MessagePrefix::PrimNArgsAnnots {
             let args_length = encoded_args.len() / 2;
@@ -133,10 +318,7 @@ impl HexDecodable for Prim {
         };
         let annots = if prefix.has_annots() {
             let encoded_annots = encoded.consume_lengh_and_value(None)?;
-            let annots_list: Vec<String> = encoded_annots
-                .split("20")
-                .map(|a| String::from(a))
-                .collect();
+            let annots_list: Vec<String> = encoded_annots.split("20").map(|a| a.into()).collect();
 
             Some(annots_list)
         } else {

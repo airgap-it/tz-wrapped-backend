@@ -142,6 +142,22 @@ impl From<tezos::TzError> for APIError {
     }
 }
 
+impl From<bigdecimal::ParseBigDecimalError> for APIError {
+    fn from(_: bigdecimal::ParseBigDecimalError) -> Self {
+        APIError::InvalidValue {
+            description: "Cannot properly parse number into BigDecimal".into(),
+        }
+    }
+}
+
+impl From<num_bigint::ParseBigIntError> for APIError {
+    fn from(_: num_bigint::ParseBigIntError) -> Self {
+        APIError::InvalidValue {
+            description: "Cannot properly parse number into BigInt".into(),
+        }
+    }
+}
+
 impl From<lettre::smtp::error::Error> for APIError {
     fn from(_: lettre::smtp::error::Error) -> Self {
         APIError::Unknown

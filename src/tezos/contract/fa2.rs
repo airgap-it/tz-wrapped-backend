@@ -1,19 +1,20 @@
+use num_bigint::BigInt;
+
 use crate::tezos::micheline::{instructions, int, sequence, string, types, MichelsonV1Expression};
 
 pub fn mint_call_micheline(
     address: String,
     contract_address: String,
-    amount: i64,
+    amount: BigInt,
     token_id: i64,
 ) -> MichelsonV1Expression {
-    let contract_entrypoint = string(format!("{}%mint", contract_address))
-        .prepack(&types::address())
-        .unwrap();
-    let address_prepacked = string(address).prepack(&types::address()).unwrap();
     sequence(vec![
         instructions::drop(),
         instructions::nil(types::operation()),
-        instructions::push(types::address(), contract_entrypoint),
+        instructions::push(
+            types::address(),
+            string(format!("{}%mint", contract_address)),
+        ),
         instructions::contract(types::list(types::pair(
             types::address(),
             types::pair(types::nat(), types::nat()),
@@ -30,7 +31,7 @@ pub fn mint_call_micheline(
         instructions::push(types::nat(), int(amount)),
         instructions::push(types::nat(), int(token_id)),
         instructions::pair(),
-        instructions::push(types::address(), address_prepacked),
+        instructions::push(types::address(), string(address)),
         instructions::pair(),
         instructions::cons(),
         instructions::transfer_tokens(),
@@ -44,16 +45,16 @@ pub fn mint_call_micheline(
 
 pub fn burn_call_micheline(
     contract_address: String,
-    amount: i64,
+    amount: BigInt,
     token_id: i64,
 ) -> MichelsonV1Expression {
-    let contract_entrypoint = string(format!("{}%burn", contract_address))
-        .prepack(&types::address())
-        .unwrap();
     sequence(vec![
         instructions::drop(),
         instructions::nil(types::operation()),
-        instructions::push(types::address(), contract_entrypoint),
+        instructions::push(
+            types::address(),
+            string(format!("{}%burn", contract_address)),
+        ),
         instructions::contract(types::list(types::pair(types::nat(), types::nat()))),
         sequence(vec![instructions::if_none(
             sequence(vec![instructions::unit(), instructions::fail_with()]),

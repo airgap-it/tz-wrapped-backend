@@ -1,15 +1,19 @@
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+};
 
 use actix_web::{web, web::Path, web::Query, HttpResponse};
 use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
+use num_bigint::BigInt;
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::models::{
     common::ListResponse,
-    contract::{Contract, SignableOperationRequest},
+    contract::Contract,
     error::APIError,
-    operation_request::{NewOperationRequest, OperationRequestKind},
+    operation_request::{NewOperationRequest, OperationRequestKind, SignableOperationRequest},
 };
 use crate::db::models::{contract::Contract as DBContract, operation_request::OperationRequest};
 use crate::settings;
@@ -80,13 +84,8 @@ pub async fn get_contract_nonce(
     let conn = pool.get()?;
     let id = path.id;
 
-    let (contract, max_nonce) = web::block::<_, _, APIError>(move || {
-        let contract = DBContract::get_by_id(&conn, id)?;
-        let max_nonce = OperationRequest::max_nonce(&conn, &contract.id)?;
-
-        Ok((contract, max_nonce))
-    })
-    .await?;
+    let contract =
+        web::block::<_, _, APIError>(move || Ok(DBContract::get_by_id(&conn, id)?)).await?;
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
         contract.kind.try_into()?,
@@ -95,13 +94,13 @@ pub async fn get_contract_nonce(
 
     let multisig_nonce = multisig.nonce().await?;
 
-    Ok(HttpResponse::Ok().json(std::cmp::max(multisig_nonce, max_nonce + 1)))
+    Ok(HttpResponse::Ok().json(multisig_nonce))
 }
 
 #[derive(Deserialize)]
 pub struct SignableInfo {
     target_address: Option<String>,
-    amount: i64,
+    amount: String,
     kind: OperationRequestKind,
 }
 
@@ -128,12 +127,13 @@ pub async fn get_signable_message(
 
     let nonce = std::cmp::max(multisig.nonce().await?, max_nonce + 1);
     let chain_id = multisig.chain_id().await?;
+    let amount = BigInt::from_str(query.amount.as_ref())?;
 
-    let message = tezos::contract::get_signable_message(
+    let signable_message = tezos::contract::get_signable_message(
         &contract,
         query.kind,
         query.target_address.as_ref(),
-        query.amount,
+        amount,
         nonce,
         chain_id.as_ref(),
         &multisig,
@@ -143,17 +143,15 @@ pub async fn get_signable_message(
     let operation_request = NewOperationRequest {
         contract_id: contract.id,
         target_address: query.target_address.clone(),
-        amount: query.amount,
+        amount: query.amount.clone(),
         kind: query.kind,
         signature: "".to_owned(),
         chain_id,
         nonce: nonce,
     };
 
-    let response = SignableOperationRequest {
-        unsigned_operation_request: operation_request,
-        signable_message: message,
-    };
-
-    Ok(HttpResponse::Ok().json(response))
+    Ok(HttpResponse::Ok().json(SignableOperationRequest::new(
+        operation_request,
+        signable_message.try_into()?,
+    )))
 }

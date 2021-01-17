@@ -6,7 +6,7 @@ use crate::tezos::{micheline::MichelsonV1Expression, TzError};
 use async_trait::async_trait;
 use tezos::micheline::{extract_key, extract_string};
 
-use super::{Multisig, Parameters, Signature, Storage};
+use super::{Multisig, Parameters, SignableMessage, Signature, Storage};
 
 pub struct GenericMultisig {
     address: String,
@@ -46,22 +46,30 @@ impl Multisig for GenericMultisig {
     async fn signable_message_for_call(
         &self,
         chain_id: String,
-        counter: i64,
+        nonce: i64,
         _contract_address: String,
         call: MichelsonV1Expression,
-    ) -> Result<String, TzError> {
-        let micheline = data::pair(string(chain_id), data::pair(int(counter), call));
+    ) -> Result<SignableMessage, TzError> {
+        let data = data::pair(
+            string(chain_id),
+            data::pair(string(self.address.clone()), data::pair(int(nonce), call)),
+        );
         let schema = types::pair(
             types::chain_id(),
             types::pair(
-                types::nat(),
-                types::lambda(types::unit(), types::operation()),
+                types::address(),
+                types::pair(
+                    types::nat(),
+                    types::lambda(types::unit(), types::list(types::operation())),
+                ),
             ),
         );
 
-        let result = micheline.pack(Some(&schema))?;
-
-        Ok(result)
+        Ok(SignableMessage {
+            packed_data: data.pack(Some(&schema))?,
+            michelson_data: data,
+            michelson_type: schema,
+        })
     }
 
     async fn parameters_for_call(

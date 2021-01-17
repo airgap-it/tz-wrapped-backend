@@ -8,7 +8,8 @@ use crate::db::models::{
     operation_approval::OperationApproval as DBOperationApproval, user::User as DBUser,
 };
 
-use super::{error::APIError, user::User};
+use super::error::APIError;
+use super::user::User;
 
 #[derive(Serialize, Deserialize)]
 pub struct OperationApproval {

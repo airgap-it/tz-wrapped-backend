@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::db::models::contract::Contract as DBContract;
 
-use super::{error::APIError, operation_request::NewOperationRequest};
+use super::error::APIError;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Contract {
@@ -74,10 +74,4 @@ impl TryFrom<&str> for ContractKind {
             }),
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SignableOperationRequest {
-    pub unsigned_operation_request: NewOperationRequest,
-    pub signable_message: String,
 }
