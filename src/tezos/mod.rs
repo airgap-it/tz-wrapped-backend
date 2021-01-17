@@ -18,10 +18,18 @@ pub enum TzError {
     ParsingFailure,
     InvalidPublicKey,
     InvalidSignature,
+    HashFailure,
+    HexDecodingFailure,
 }
 
 impl From<serde_json::Error> for TzError {
     fn from(_: serde_json::Error) -> Self {
+        TzError::ParsingFailure
+    }
+}
+
+impl From<num_bigint::ParseBigIntError> for TzError {
+    fn from(_: num_bigint::ParseBigIntError) -> Self {
         TzError::ParsingFailure
     }
 }

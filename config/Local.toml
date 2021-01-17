@@ -15,28 +15,28 @@ decimals = 8
 [[contracts.gatekeepers]]
 public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
 name = "Ugly Release"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.gatekeepers]]
 public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
 name = "Sudden Push GK"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Ugly Release"
-email = "mike@hypergate.com"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Thrive Umbrella"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Sudden Push KH"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts]]
-address = "KT1S4QXjASmM3ei7a6raRLkr4TbnKu7RuC9X"
-multisig = "KT1TD6buzFQbLLYfx92UpZ6N2jfCaat3GSrN"
+address = "KT1R9zSv54P6H4okbLQYKA6S8W3zdsKR6cTJ"
+multisig = "KT1LW1vW2XhQ2VA5xfG3cpLVVetadi65QYbP"
 name = "tzETH"
 kind = "fa2"
 token_id = 0
@@ -45,12 +45,12 @@ decimals = 18
 [[contracts.gatekeepers]]
 public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
 name = "Ugly Release"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.gatekeepers]]
 public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
 name = "Sudden Push"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Alice"
@@ -58,8 +58,8 @@ email = "mike@hypergate.com"
 
 [[contracts.keyholders]]
 name = "Robert"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Dan"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"

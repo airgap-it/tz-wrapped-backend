@@ -1,5 +1,9 @@
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{self, TryFrom, TryInto},
+    fmt::Display,
+};
 
+use num_bigint::BigInt;
 use primitive::Primitive;
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +22,15 @@ pub fn string(value: String) -> MichelsonV1Expression {
     MichelsonV1Expression::Literal(literal::Literal::String(value))
 }
 
-pub fn int(value: i64) -> MichelsonV1Expression {
-    MichelsonV1Expression::Literal(literal::Literal::Int(value))
+// pub fn int(value: BigInt) -> MichelsonV1Expression {
+//     MichelsonV1Expression::Literal(literal::Literal::Int(value))
+// }
+
+pub fn int<T>(value: T) -> MichelsonV1Expression
+where
+    T: convert::Into<BigInt>,
+{
+    MichelsonV1Expression::Literal(literal::Literal::Int(value.into()))
 }
 
 pub fn bytes(value: Vec<u8>) -> MichelsonV1Expression {
@@ -68,6 +79,7 @@ impl MichelsonV1Expression {
         Ok(match type_ {
             Type::List | Type::Set => self.prepack_sequence(args)?,
             Type::Map | Type::BigMap => self.prepack_map(args)?,
+            Type::Lambda => self.prepack_lambda()?,
             Type::Pair => self.prepack_pair(args)?,
             Type::Option => {
                 if let Some(prepacked) = self.prepack_option(args) {
@@ -185,6 +197,25 @@ impl MichelsonV1Expression {
                 .collect();
 
             Ok(sequence(prepacked?))
+        } else {
+            Err(TzError::InvalidType)
+        }
+    }
+
+    fn prepack_lambda(&self) -> Result<MichelsonV1Expression, TzError> {
+        if let MichelsonV1Expression::Sequence(values) = self {
+            let packed = values
+                .iter()
+                .map(|value| match value {
+                    MichelsonV1Expression::Prim(prim) => {
+                        Ok(MichelsonV1Expression::Prim(prim.prepack_instruction()?))
+                    }
+                    MichelsonV1Expression::Literal(_) => Err(TzError::InvalidType),
+                    MichelsonV1Expression::Sequence(_) => value.prepack_lambda(),
+                })
+                .collect::<Result<Vec<MichelsonV1Expression>, TzError>>();
+
+            Ok(sequence(packed?))
         } else {
             Err(TzError::InvalidType)
         }
@@ -343,6 +374,28 @@ impl MichelsonV1Expression {
     }
 }
 
+impl Display for MichelsonV1Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MichelsonV1Expression::Prim(value) => write!(f, "{}", value),
+            MichelsonV1Expression::Literal(value) => write!(f, "{}", value),
+            MichelsonV1Expression::Sequence(values) => {
+                let mut current: String = "{ ".into();
+                for (index, value) in values.iter().enumerate() {
+                    current = format!(
+                        "{}{}{}",
+                        current,
+                        value,
+                        if index != values.len() - 1 { "; " } else { "" }
+                    )
+                }
+                current = format!("{}}}", current);
+                write!(f, "{}", current)
+            }
+        }
+    }
+}
+
 impl HexEncodable for MichelsonV1Expression {
     fn to_hex_encoded(&self) -> Result<String, TzError> {
         match self {
@@ -374,7 +427,7 @@ impl HexDecodable for MichelsonV1Expression {
 
 impl HexEncodable for Vec<MichelsonV1Expression> {
     fn to_hex_encoded(&self) -> Result<String, TzError> {
-        let initial: Result<String, TzError> = Ok(String::from(""));
+        let initial: Result<String, TzError> = Ok("".into());
         let encoded = self.iter().fold(initial, |current, next| {
             let encoded_item = next.to_hex_encoded()?;
             let result = format!("{}{}", current?, encoded_item);
@@ -450,7 +503,7 @@ pub fn extract_prim(value: &MichelsonV1Expression) -> Result<&prim::Prim, TzErro
     }
 }
 
-pub fn extract_int(value: &MichelsonV1Expression) -> Result<&i64, TzError> {
+pub fn extract_int(value: &MichelsonV1Expression) -> Result<&BigInt, TzError> {
     if let MichelsonV1Expression::Literal(literal::Literal::Int(value)) = value {
         Ok(value)
     } else {
@@ -578,7 +631,7 @@ mod test {
 
     #[test]
     fn test_micheline_coding_1() -> Result<(), TzError> {
-        let micheline = data::pair(int(1), string("test".to_owned()));
+        let micheline = data::pair(int(1), string("test".into()));
 
         let encoded = micheline.to_hex_encoded()?;
         let encoded_str = "07070001010000000474657374";
@@ -970,6 +1023,108 @@ mod test {
 
         let packed = micheline.pack(Some(&schema))?;
         assert_eq!(packed, "05008898d2fa0b");
+
+        Ok(())
+    }
+
+    fn test_micheline_pack_12() -> Result<(), TzError> {
+        let call = sequence(vec![
+            instructions::drop(),
+            instructions::nil(types::operation()),
+            instructions::push(
+                types::address(),
+                string("KT1S4QXjASmM3ei7a6raRLkr4TbnKu7RuC9X%mint".into()),
+            ),
+            instructions::contract(types::list(types::pair(
+                types::address(),
+                types::pair(types::nat(), types::nat()),
+            ))),
+            sequence(vec![instructions::if_none(
+                sequence(vec![instructions::unit(), instructions::fail_with()]),
+                sequence(vec![]),
+            )]),
+            instructions::push(types::mutez(), int(0)),
+            instructions::nil(types::pair(
+                types::address(),
+                types::pair(types::nat(), types::nat()),
+            )),
+            instructions::push(types::nat(), int(1)),
+            instructions::push(types::nat(), int(0)),
+            instructions::pair(),
+            instructions::push(
+                types::address(),
+                string("tz1Mj7RzPmMAqDUNFBn5t5VbXmWW4cSUAdtT".into()),
+            ),
+            instructions::pair(),
+            instructions::cons(),
+            instructions::transfer_tokens(),
+            instructions::cons(),
+        ]);
+
+        let micheline = data::pair(string("NetXm8tYqnMWky1".into()), data::pair(int(2), call));
+        let schema = types::pair(
+            types::chain_id(),
+            types::pair(
+                types::nat(),
+                types::lambda(types::unit(), types::list(types::operation())),
+            ),
+        );
+
+        let packed = micheline.pack(Some(&schema))?;
+        assert_eq!(packed, "0507070a00000004a83650210707000202000000930320053d036d0743036e0a0000001a01bfb439dbd450df69f25257e901c568377527cb11006d696e740555055f0765036e0765036203620200000010072f0200000004034f032702000000000743036a0000053d0765036e07650362036207430362000107430362000003420743036e0a00000016000016e64994c2ddbd293695b63e4cade029d3c8b5e30342031b034d031b");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_display_michelson() -> Result<(), TzError> {
+        let call = sequence(vec![
+            instructions::drop(),
+            instructions::nil(types::operation()),
+            instructions::push(
+                types::address(),
+                string("KT1S4QXjASmM3ei7a6raRLkr4TbnKu7RuC9X%mint".into()),
+            ),
+            instructions::contract(types::list(types::pair(
+                types::address(),
+                types::pair(types::nat(), types::nat()),
+            ))),
+            sequence(vec![instructions::if_none(
+                sequence(vec![instructions::unit(), instructions::fail_with()]),
+                sequence(vec![]),
+            )]),
+            instructions::push(types::mutez(), int(0)),
+            instructions::nil(types::pair(
+                types::address(),
+                types::pair(types::nat(), types::nat()),
+            )),
+            instructions::push(types::nat(), int(1)),
+            instructions::push(types::nat(), int(0)),
+            instructions::pair(),
+            instructions::push(
+                types::address(),
+                string("tz1Mj7RzPmMAqDUNFBn5t5VbXmWW4cSUAdtT".into()),
+            ),
+            instructions::pair(),
+            instructions::cons(),
+            instructions::transfer_tokens(),
+            instructions::cons(),
+        ]);
+
+        let micheline = data::pair(string("NetXm8tYqnMWky1".into()), data::pair(int(2), call));
+        let schema = types::pair(
+            types::chain_id(),
+            types::pair(
+                types::nat(),
+                types::lambda(types::unit(), types::list(types::operation())),
+            ),
+        );
+
+        assert_eq!(format!("{}", micheline), "(Pair \"NetXm8tYqnMWky1\" (Pair 2 { DROP; NIL operation; PUSH address \"KT1S4QXjASmM3ei7a6raRLkr4TbnKu7RuC9X%mint\"; CONTRACT (list (pair address (pair nat nat))); { IF_NONE { UNIT; FAILWITH} { }}; PUSH mutez 0; NIL (pair address (pair nat nat)); PUSH nat 1; PUSH nat 0; PAIR; PUSH address \"tz1Mj7RzPmMAqDUNFBn5t5VbXmWW4cSUAdtT\"; PAIR; CONS; TRANSFER_TOKENS; CONS}))");
+        assert_eq!(
+            format!("{}", schema),
+            "(pair chain_id (pair nat (lambda unit (list operation))))"
+        );
 
         Ok(())
     }

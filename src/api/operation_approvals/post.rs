@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
 use actix_web::{web, HttpResponse};
+use multisig::SignableMessage;
 use uuid::Uuid;
 
 use crate::api::models::user::UserKind;
@@ -8,7 +9,6 @@ use crate::api::models::{
     error::APIError,
     operation_approval::{NewOperationApproval, OperationApproval},
 };
-use crate::crypto;
 use crate::db::models::{
     contract::Contract,
     operation_approval::NewOperationApproval as DBNewOperationApproval,
@@ -36,11 +36,11 @@ pub async fn post_approval(
         tezos_settings.node_url.as_ref(),
     );
 
-    let message = get_signable_message(
+    let signable_message = get_signable_message(
         &contract,
         operation_request.kind.try_into()?,
         operation_request.target_address.as_ref(),
-        operation_request.amount,
+        operation_request.amount.as_bigint_and_exponent().0,
         operation_request.nonce.into(),
         operation_request.chain_id.as_ref(),
         &multisig,
@@ -51,7 +51,7 @@ pub async fn post_approval(
 
     let keyholder = find_and_validate_keyholder(
         &pool,
-        message,
+        &signable_message,
         &contract,
         multisig,
         &body,
@@ -77,9 +77,10 @@ pub async fn post_approval(
                 let gatekeeper = User::get_by_id(&conn, operation_request.gatekeeper_id);
                 if let Ok(gatekeeper) = gatekeeper {
                     let _notification_result = notify_min_approvals_received(
-                        gatekeeper,
+                        &gatekeeper,
                         operation_request.kind.try_into().unwrap(),
-                        contract,
+                        &operation_request,
+                        &contract,
                     );
                 }
             }
@@ -112,7 +113,7 @@ async fn store_approval(
 
 async fn find_and_validate_keyholder(
     pool: &web::Data<DbPool>,
-    message: String,
+    message: &SignableMessage,
     contract: &Contract,
     mut multisig: Box<dyn Multisig + '_>,
     operation_approval: &NewOperationApproval,
@@ -143,7 +144,7 @@ async fn find_and_validate_keyholder(
                 public_key,
                 display_name: keyholder_settings
                     .map(|kh| kh.name.clone())
-                    .unwrap_or(String::from("Unknown")),
+                    .unwrap_or("Unknown".into()),
                 email: keyholder_settings.map(|kh| kh.email.clone()),
             }
         })
@@ -159,13 +160,7 @@ async fn find_and_validate_keyholder(
     })
     .await?;
 
-    let message_bytes = hex::decode(message).map_err(|_error| APIError::InvalidValue {
-        description: String::from("expected valid hex value"),
-    })?;
-
-    let hashed = crypto::generic_hash(&message_bytes, 32).map_err(|_error| APIError::Internal {
-        description: String::from("hash failure"),
-    })?;
+    let hashed = message.blake2b_hash()?;
 
     let mut result: Result<User, APIError> = Err(APIError::InvalidSignature);
     for kh in keyholders {

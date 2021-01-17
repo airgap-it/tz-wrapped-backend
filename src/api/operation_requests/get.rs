@@ -10,9 +10,10 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::models::{
-    common::ListResponse, error::APIError, operation_approval::NewOperationApproval,
-    operation_request::ApprovableOperationRequest, operation_request::OperationRequest,
-    operation_request::OperationRequestKind,
+    common::{ListResponse, SignableMessageInfo},
+    error::APIError,
+    operation_request::OperationRequest,
+    operation_request::{OperationRequestKind, OperationRequestState},
 };
 use crate::db::models::{
     contract::Contract, operation_request::OperationRequest as DBOperationRequest, user::User,
@@ -27,6 +28,7 @@ use crate::DbPool;
 pub struct Info {
     kind: OperationRequestKind,
     contract_id: Uuid,
+    state: Option<OperationRequestState>,
     page: Option<i64>,
     limit: Option<i64>,
 }
@@ -41,8 +43,10 @@ pub async fn get_operation_requests(
     let limit = query.limit.unwrap_or(10);
     let kind = query.kind;
     let contract_id = query.contract_id;
+    let state = query.state;
     let result =
-        web::block(move || load_operation_requests(&conn, page, limit, kind, contract_id)).await?;
+        web::block(move || load_operation_requests(&conn, page, limit, kind, contract_id, state))
+            .await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
@@ -53,9 +57,10 @@ fn load_operation_requests(
     limit: i64,
     kind: OperationRequestKind,
     contract_id: Uuid,
+    state: Option<OperationRequestState>,
 ) -> Result<ListResponse<OperationRequest>, APIError> {
     let (operations_with_gatekeepers, total_pages) =
-        DBOperationRequest::get_list(conn, kind, contract_id, page, limit)?;
+        DBOperationRequest::get_list(conn, kind, contract_id, state, page, limit)?;
 
     let results = operations_with_gatekeepers
         .into_iter()
@@ -115,7 +120,7 @@ pub async fn get_signable_message(
     tezos_settings: web::Data<settings::Tezos>,
 ) -> Result<HttpResponse, APIError> {
     let id = path.id;
-    let (operation, contract) = load_operation_and_contract(&pool, &id).await?;
+    let (operation_request, contract) = load_operation_and_contract(&pool, &id).await?;
 
     let multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
@@ -123,24 +128,20 @@ pub async fn get_signable_message(
         tezos_settings.node_url.as_ref(),
     );
 
-    let message = tezos::contract::get_signable_message(
+    let signable_message = tezos::contract::get_signable_message(
         &contract,
-        operation.kind.try_into()?,
-        operation.target_address.as_ref(),
-        operation.amount,
-        operation.nonce,
-        operation.chain_id.as_ref(),
+        operation_request.kind.try_into()?,
+        operation_request.target_address.as_ref(),
+        operation_request.amount.as_bigint_and_exponent().0,
+        operation_request.nonce,
+        operation_request.chain_id.as_ref(),
         &multisig,
     )
     .await?;
 
-    Ok(HttpResponse::Ok().json(ApprovableOperationRequest {
-        unsigned_operation_approval: NewOperationApproval {
-            operation_request_id: id,
-            signature: String::from(""),
-        },
-        signable_message: message,
-    }))
+    let signable_message_info: SignableMessageInfo = signable_message.try_into()?;
+
+    Ok(HttpResponse::Ok().json(signable_message_info))
 }
 
 pub async fn get_operation_request_parameters(
@@ -150,7 +151,7 @@ pub async fn get_operation_request_parameters(
 ) -> Result<HttpResponse, APIError> {
     let conn = pool.get()?;
     let id = path.id;
-    let (operation, contract, approvals) = web::block::<_, _, APIError>(move || {
+    let (operation_request, contract, approvals) = web::block::<_, _, APIError>(move || {
         let operation_request = DBOperationRequest::get_by_id(&conn, &id)?;
         let contract = Contract::get_by_id(&conn, operation_request.contract_id)?;
         let approvals = operation_request.approvals(&conn)?;
@@ -166,9 +167,9 @@ pub async fn get_operation_request_parameters(
     );
     let call = contract_call_for(
         &contract,
-        operation.kind.try_into()?,
-        operation.target_address.as_ref(),
-        operation.amount,
+        operation_request.kind.try_into()?,
+        operation_request.target_address.as_ref(),
+        operation_request.amount.as_bigint_and_exponent().0,
     )?;
     let signatures = approvals
         .iter()
@@ -178,7 +179,7 @@ pub async fn get_operation_request_parameters(
         })
         .collect::<Vec<Signature>>();
     let parameters = multisig
-        .parameters_for_call(call, operation.nonce, signatures, &contract.pkh)
+        .parameters_for_call(call, operation_request.nonce, signatures, &contract.pkh)
         .await?;
 
     Ok(HttpResponse::Ok().json(parameters))

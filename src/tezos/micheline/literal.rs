@@ -1,5 +1,9 @@
 use hex;
+use num_bigint::{BigInt, BigUint};
+use num_traits::{abs, Num, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{fmt::Display, str::FromStr};
+use utils::biguint_to_u8;
 
 use super::{super::utils, super::utils::ConsumableHexStr, HexDecodable, HexEncodable, TzError};
 
@@ -12,7 +16,7 @@ pub enum Literal {
         serialize_with = "literal_int_serializer",
         deserialize_with = "literal_int_deserializer"
     )]
-    Int(i64),
+    Int(BigInt),
 
     #[serde(
         serialize_with = "literal_bytes_serializer",
@@ -21,22 +25,22 @@ pub enum Literal {
     Bytes(Vec<u8>),
 }
 
-fn literal_int_serializer<S>(int_value: &i64, s: S) -> Result<S::Ok, S::Error>
+fn literal_int_serializer<S>(int_value: &BigInt, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
     s.serialize_str(&int_value.to_string())
 }
 
-fn literal_int_deserializer<'de, D>(d: D) -> Result<i64, D::Error>
+fn literal_int_deserializer<'de, D>(d: D) -> Result<BigInt, D::Error>
 where
     D: Deserializer<'de>,
 {
     let int_value = String::deserialize(d)?;
-    let int = int_value.parse::<i64>().map_err(|_error| {
+    let int = BigInt::from_str(&int_value).map_err(|_error| {
         serde::de::Error::invalid_type(
             serde::de::Unexpected::Str(&int_value),
-            &"a string representing a valid i64",
+            &"a string representing a valid integer number",
         )
     })?;
 
@@ -61,6 +65,18 @@ where
     })?;
 
     Ok(bytes)
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Literal::String(value) => format!("\"{}\"", value),
+            Literal::Int(value) => format!("{}", value),
+            Literal::Bytes(bytes) => format!("0x{}", hex::encode(bytes)),
+        };
+
+        write!(f, "{}", value)
+    }
 }
 
 impl HexEncodable for Literal {
@@ -97,17 +113,25 @@ impl Literal {
         )
     }
 
-    fn hex_encode_int(value: &i64) -> String {
-        let mut absolute = value.abs();
+    fn hex_encode_int(value: &BigInt) -> String {
+        let mut absolute = abs(value.clone()).to_biguint().unwrap();
         let mut bytes: Vec<u8> = vec![];
 
-        let sign_mask: i64 = if value < &0 { 0b11000000 } else { 0b10000000 };
+        let sign_mask = if value < &BigInt::zero() {
+            BigUint::from(0b11000000u8)
+        } else {
+            BigUint::from(0b10000000u8)
+        };
 
-        bytes.push(((absolute & 0b00111111) | sign_mask) as u8);
+        bytes.push(biguint_to_u8(
+            &((&absolute & BigUint::from(0b00111111u8)) | sign_mask),
+        ));
         absolute >>= 6;
 
-        while absolute != 0 {
-            bytes.push(((absolute & 0b01111111) | 0b10000000) as u8);
+        while absolute != BigUint::zero() {
+            bytes.push(biguint_to_u8(
+                &((&absolute & BigUint::from(0b01111111u8)) | BigUint::from(0b10000000u8)),
+            ));
             absolute >>= 7;
         }
 
@@ -115,13 +139,12 @@ impl Literal {
 
         bytes[length - 1] &= 0b01111111;
 
-        bytes.iter().fold(
-            String::from(MessagePrefix::Int.prefix()),
-            |current, next| {
+        bytes
+            .iter()
+            .fold(MessagePrefix::Int.prefix().into(), |current, next| {
                 let hex_value = utils::num_to_padded_str(*next, Some(2), None);
                 format!("{}{}", current, hex_value)
-            },
-        )
+            })
     }
 
     fn hex_encode_bytes(value: &Vec<u8>) -> String {
@@ -169,7 +192,7 @@ impl Literal {
         binary_numbers.reverse();
         let binary_string = binary_numbers.join("");
         let result =
-            i64::from_str_radix(&binary_string, 2).map_err(|_error| TzError::InvalidType)?;
+            BigInt::from_str_radix(&binary_string, 2).map_err(|_error| TzError::InvalidType)?;
 
         let factor = if is_negative { -1 } else { 1 };
 
@@ -219,11 +242,11 @@ mod test {
 
     #[test]
     fn test_serialization() -> () {
-        let string = Literal::String(String::from("Test"));
+        let string = Literal::String("Test".into());
         let string_json = serde_json::json!(string).to_string();
         assert_eq!(string_json, r#"{"string":"Test"}"#);
 
-        let int = Literal::Int(100);
+        let int = Literal::Int(100.into());
         let int_json = serde_json::json!(int).to_string();
         assert_eq!(int_json, r#"{"int":"100"}"#);
 
@@ -238,13 +261,13 @@ mod test {
             "string": "Test"
         });
         let string: Literal = serde_json::from_value(string_json)?;
-        assert_eq!(string, Literal::String(String::from("Test")));
+        assert_eq!(string, Literal::String("Test".into()));
 
         let int_json = serde_json::json!({
             "int": "100"
         });
         let int: Literal = serde_json::from_value(int_json)?;
-        assert_eq!(int, Literal::Int(100));
+        assert_eq!(int, Literal::Int(100.into()));
 
         let bytes_json = serde_json::json!({
             "bytes": "0aff05"
@@ -257,7 +280,7 @@ mod test {
 
     #[test]
     fn test_string_hex_encoding() -> Result<(), TzError> {
-        let string = Literal::String(String::from("Test"));
+        let string = Literal::String("Test".into());
         let hex_value = string.to_hex_encoded()?;
         assert_eq!(hex_value, "010000000454657374");
 
@@ -266,7 +289,7 @@ mod test {
 
     #[test]
     fn test_int_hex_encoding_1() -> Result<(), TzError> {
-        let int = Literal::Int(100);
+        let int = Literal::Int(100.into());
         let hex_value = int.to_hex_encoded()?;
         assert_eq!(hex_value, "00a401");
 
@@ -275,9 +298,9 @@ mod test {
 
     #[test]
     fn test_int_hex_encoding_2() -> Result<(), TzError> {
-        let int = Literal::Int(100000);
+        let int = Literal::Int(BigInt::from_str("10000000000000000000")?);
         let hex_value = int.to_hex_encoded()?;
-        assert_eq!(hex_value, "00a09a0c");
+        assert_eq!(hex_value, "008080c09e91c191c79502");
 
         Ok(())
     }
@@ -295,7 +318,7 @@ mod test {
     fn test_string_hex_decoding() -> Result<(), TzError> {
         let mut encoded = ConsumableHexStr::new("010000000454657374");
         let value = Literal::from_hex(&mut encoded)?;
-        assert_eq!(value, Literal::String(String::from("Test")));
+        assert_eq!(value, Literal::String("Test".into()));
 
         Ok(())
     }
@@ -305,7 +328,7 @@ mod test {
         let mut encoded = ConsumableHexStr::new("00a401");
         let value = Literal::from_hex(&mut encoded)?;
 
-        assert_eq!(value, Literal::Int(100));
+        assert_eq!(value, Literal::Int(100.into()));
 
         Ok(())
     }
@@ -315,7 +338,7 @@ mod test {
         let mut encoded = ConsumableHexStr::new("00a09a0c");
         let value = Literal::from_hex(&mut encoded)?;
 
-        assert_eq!(value, Literal::Int(100000));
+        assert_eq!(value, Literal::Int(100000.into()));
 
         Ok(())
     }

@@ -7,7 +7,7 @@ use crate::tezos::{
     TzError,
 };
 
-use super::{Multisig, Parameters, Signature, Storage};
+use super::{Multisig, Parameters, SignableMessage, Signature, Storage};
 
 pub struct SpecificMultisig {
     address: String,
@@ -47,14 +47,14 @@ impl Multisig for SpecificMultisig {
     async fn signable_message_for_call(
         &self,
         chain_id: String,
-        counter: i64,
+        nonce: i64,
         contract_address: String,
         call: MichelsonV1Expression,
-    ) -> Result<String, TzError> {
+    ) -> Result<SignableMessage, TzError> {
         let micheline = data::pair(
             data::pair(string(chain_id), string(self.address.to_owned())),
             data::pair(
-                int(counter),
+                int(nonce),
                 data::left(data::pair(call, string(contract_address))),
             ),
         );
@@ -76,9 +76,11 @@ impl Multisig for SpecificMultisig {
             signable_schema.to_owned(),
         );
 
-        let result = micheline.pack(Some(&schema))?;
-
-        Ok(result)
+        Ok(SignableMessage {
+            packed_data: micheline.pack(Some(&schema))?,
+            michelson_data: micheline,
+            michelson_type: schema,
+        })
     }
 
     async fn parameters_for_call(

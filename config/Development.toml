@@ -12,24 +12,24 @@ decimals = 8
 [[contracts.gatekeepers]]
 public_key = "edpkvVL8vEq7PTm7mbTyomvA3h6RNsJTKt213WN2Z4Zt87cQommPZ3"
 name = "Tester"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.gatekeepers]]
 public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
 name = "Bitcoin Suisse"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "inacta"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Lexr"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Swiss Crypto Tokens"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts]]
 address = "KT1S4QXjASmM3ei7a6raRLkr4TbnKu7RuC9X"
@@ -42,12 +42,12 @@ decimals = 18
 [[contracts.gatekeepers]]
 public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
 name = "Ugly Release"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.gatekeepers]]
 public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
 name = "Sudden Push"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Alice"
@@ -55,8 +55,8 @@ email = "mike@hypergate.com"
 
 [[contracts.keyholders]]
 name = "Robert"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"
 
 [[contracts.keyholders]]
 name = "Dan"
-email = "m.godenzi@papers.ch"
+email = "godenzim@me.com"

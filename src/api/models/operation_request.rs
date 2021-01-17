@@ -11,7 +11,9 @@ use crate::db::models::{
     operation_request::OperationRequest as DBOperationRequest, user::User as DBUser,
 };
 
-use super::{error::APIError, operation_approval::NewOperationApproval, user::User};
+use super::common::SignableMessageInfo;
+use super::error::APIError;
+use super::user::User;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OperationRequest {
@@ -21,7 +23,7 @@ pub struct OperationRequest {
     pub gatekeeper: User,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: i64,
+    pub amount: String,
     pub kind: OperationRequestKind,
     pub signature: String,
     pub chain_id: String,
@@ -42,7 +44,7 @@ impl OperationRequest {
             gatekeeper: gatekeeper.try_into()?,
             contract_id: operation.contract_id,
             target_address: operation.target_address,
-            amount: operation.amount,
+            amount: operation.amount.to_string(),
             kind: operation.kind.try_into()?,
             signature: operation.signature,
             chain_id: operation.chain_id,
@@ -57,7 +59,7 @@ impl OperationRequest {
 pub struct NewOperationRequest {
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: i64,
+    pub amount: String,
     pub kind: OperationRequestKind,
     pub signature: String,
     pub chain_id: String,
@@ -209,7 +211,19 @@ impl Display for OperationRequestState {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApprovableOperationRequest {
-    pub unsigned_operation_approval: NewOperationApproval,
-    pub signable_message: String,
+pub struct SignableOperationRequest {
+    pub unsigned_operation_request: NewOperationRequest,
+    pub signable_message_info: SignableMessageInfo,
+}
+
+impl SignableOperationRequest {
+    pub fn new(
+        unsigned_operation_request: NewOperationRequest,
+        signable_message_info: SignableMessageInfo,
+    ) -> Self {
+        SignableOperationRequest {
+            unsigned_operation_request,
+            signable_message_info,
+        }
+    }
 }

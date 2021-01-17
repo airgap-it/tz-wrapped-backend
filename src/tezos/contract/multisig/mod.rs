@@ -1,18 +1,21 @@
+use async_trait::async_trait;
+use num_traits::ToPrimitive;
 use std::convert::TryFrom;
 
-use async_trait::async_trait;
-
-use crate::tezos::{
-    micheline::{
-        extract_int, extract_sequence, extract_string, primitive::Data, MichelsonV1Expression,
-    },
-    TzError,
-};
 use crate::{
     api::models::contract::ContractKind,
     tezos::micheline::{extract_prim, primitive::Primitive},
 };
-use serde::{Deserialize, Serialize};
+use crate::{
+    crypto,
+    tezos::{
+        micheline::{
+            extract_int, extract_sequence, extract_string, primitive::Data, MichelsonV1Expression,
+        },
+        TzError,
+    },
+};
+use serde::Serialize;
 
 mod generic_multisig;
 mod specific_multisig;
@@ -54,10 +57,10 @@ pub trait Multisig: Send + Sync {
     async fn signable_message_for_call(
         &self,
         chain_id: String,
-        counter: i64,
+        nonce: i64,
         contract_address: String,
         call: MichelsonV1Expression,
-    ) -> Result<String, TzError>;
+    ) -> Result<SignableMessage, TzError>;
 
     async fn parameters_for_call(
         &mut self,
@@ -68,17 +71,39 @@ pub trait Multisig: Send + Sync {
     ) -> Result<Parameters, TzError>;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct Parameters {
     pub entrypoint: String,
     pub value: MichelsonV1Expression,
 }
 
+#[derive(Debug)]
 pub struct Signature<'a> {
     pub value: &'a str,
     pub public_key: &'a str,
 }
 
+#[derive(Debug)]
+pub struct SignableMessage {
+    pub packed_data: String,
+    pub michelson_data: MichelsonV1Expression,
+    pub michelson_type: MichelsonV1Expression,
+}
+
+impl SignableMessage {
+    pub fn blake2b_hash(&self) -> Result<Vec<u8>, TzError> {
+        let message_bytes =
+            hex::decode(&self.packed_data).map_err(|_error| TzError::HexDecodingFailure)?;
+
+        Ok(crypto::generic_hash(&message_bytes, 32).map_err(|_error| TzError::HashFailure)?)
+    }
+
+    pub fn ledger_blake2b_hash(&self) -> Result<String, TzError> {
+        Ok(bs58::encode(self.blake2b_hash()?).into_string())
+    }
+}
+
+#[derive(Debug)]
 struct Storage {
     nonce: i64,
     min_signatures: i64,
@@ -115,8 +140,8 @@ impl TryFrom<&MichelsonV1Expression> for Storage {
             .collect::<Result<Vec<&String>, TzError>>()?;
 
         Ok(Storage {
-            nonce: *nonce,
-            min_signatures: *min_signatures,
+            nonce: nonce.to_i64().unwrap(),
+            min_signatures: min_signatures.to_i64().unwrap(),
             approvers_public_keys: public_keys
                 .iter()
                 .map(|pk| pk.to_owned().to_owned())
@@ -144,25 +169,3 @@ impl Storage {
         Ok(storage)
     }
 }
-
-// #[cfg(test)]
-// mod test {
-//     use crate::tezos::micheline::TzError;
-//     use super::*;
-
-//     #[actix_rt::test]
-//     async fn test_multisig_fetch() -> Result<(), TzError> {
-
-//         let mut multisig = Multisig {
-//             address: String::from("KT1BYMvJoM75JyqFbsLKouqkAv8dgEvViioP"),
-//             node_url: String::from("https://delphinet-tezos.giganode.io"),
-//             storage: None
-//         };
-
-//         let counter = multisig.counter().await?;
-//         let min_sign = multisig.min_signatures().await?;
-//         let pks = multisig.approvers().await?;
-
-//         Ok(())
-//     }
-// }

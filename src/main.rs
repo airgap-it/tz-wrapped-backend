@@ -173,7 +173,7 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
                     public_key: public_key.clone(),
                     display_name: keyholder_settings
                         .map(|kh| kh.name.clone())
-                        .unwrap_or(String::from("Unknown")),
+                        .unwrap_or("Unknown".into()),
                     email: keyholder_settings.map(|kh| kh.email.clone()),
                 }
             })
