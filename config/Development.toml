@@ -32,8 +32,8 @@ name = "Swiss Crypto Tokens"
 email = "godenzim@me.com"
 
 [[contracts]]
-address = "KT1S4QXjASmM3ei7a6raRLkr4TbnKu7RuC9X"
-multisig = "KT1TD6buzFQbLLYfx92UpZ6N2jfCaat3GSrN"
+address = "KT1R9zSv54P6H4okbLQYKA6S8W3zdsKR6cTJ"
+multisig = "KT1LW1vW2XhQ2VA5xfG3cpLVVetadi65QYbP"
 name = "tzETH"
 kind = "fa2"
 token_id = 0
