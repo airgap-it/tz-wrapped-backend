@@ -21,7 +21,7 @@ pub enum APIError {
     #[display(fmt = "invalid signature")]
     InvalidSignature,
 
-    #[display(fmt = "Database error: {}", description)]
+    #[display(fmt = "database error: {}", description)]
     DBError { description: String },
 
     #[display(fmt = "invalid public key")]
@@ -39,6 +39,15 @@ pub enum APIError {
     #[display(fmt = "invalid operation state: {}", description)]
     InvalidOperationState { description: String },
 
+    #[display(fmt = "unauthorized")]
+    Unauthorized,
+
+    #[display(fmt = "forbidden")]
+    Forbidden,
+
+    #[display(fmt = "authentication challenge expired")]
+    AuthenticationChallengeExpired,
+
     #[display(fmt = "unknown error")]
     Unknown,
 }
@@ -46,19 +55,20 @@ pub enum APIError {
 impl APIError {
     pub fn name(&self) -> String {
         match self {
-            APIError::NotFound => "NotFound".to_string(),
-            APIError::InvalidSignature => "InvalidSignature".to_string(),
-            APIError::DBError { description: _ } => "DBError".to_string(),
-            APIError::InvalidPublicKey => "InvalidPublicKey".to_string(),
-            APIError::Internal { description: _ } => "Internal".to_string(),
+            APIError::NotFound => "NotFound".into(),
+            APIError::InvalidSignature => "InvalidSignature".into(),
+            APIError::DBError { description: _ } => "DBError".into(),
+            APIError::InvalidPublicKey => "InvalidPublicKey".into(),
+            APIError::Internal { description: _ } => "Internal".into(),
             APIError::InvalidOperationRequest { description: _ } => {
-                "InvalidOperationRequest".to_string()
+                "InvalidOperationRequest".into()
             }
-            APIError::InvalidOperationState { description: _ } => {
-                "InvalidOperationState".to_string()
-            }
-            APIError::InvalidValue { description: _ } => "InvalidValue".to_string(),
-            APIError::Unknown => "Unknown".to_string(),
+            APIError::InvalidOperationState { description: _ } => "InvalidOperationState".into(),
+            APIError::InvalidValue { description: _ } => "InvalidValue".into(),
+            APIError::Unauthorized => "Unauthorized".into(),
+            APIError::Forbidden => "Forbidden".into(),
+            APIError::AuthenticationChallengeExpired => "AuthenticationChallengeExpired".into(),
+            APIError::Unknown => "Unknown".into(),
         }
     }
 }
@@ -74,6 +84,9 @@ impl ResponseError for APIError {
             APIError::InvalidOperationRequest { description: _ } => StatusCode::BAD_REQUEST,
             APIError::InvalidOperationState { description: _ } => StatusCode::BAD_REQUEST,
             APIError::InvalidValue { description: _ } => StatusCode::BAD_REQUEST,
+            APIError::Unauthorized => StatusCode::FORBIDDEN,
+            APIError::Forbidden => StatusCode::FORBIDDEN,
+            APIError::AuthenticationChallengeExpired => StatusCode::BAD_REQUEST,
             APIError::Unknown => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -135,6 +148,7 @@ impl From<tezos::TzError> for APIError {
         match value {
             tezos::TzError::InvalidPublicKey => APIError::InvalidPublicKey,
             tezos::TzError::InvalidSignature => APIError::InvalidSignature,
+            tezos::TzError::InvalidValue { description } => APIError::InvalidValue { description },
             _ => APIError::Internal {
                 description: value.to_string(),
             },
@@ -145,7 +159,7 @@ impl From<tezos::TzError> for APIError {
 impl From<bigdecimal::ParseBigDecimalError> for APIError {
     fn from(_: bigdecimal::ParseBigDecimalError) -> Self {
         APIError::InvalidValue {
-            description: "Cannot properly parse number into BigDecimal".into(),
+            description: "cannot properly parse number into BigDecimal".into(),
         }
     }
 }
@@ -153,7 +167,7 @@ impl From<bigdecimal::ParseBigDecimalError> for APIError {
 impl From<num_bigint::ParseBigIntError> for APIError {
     fn from(_: num_bigint::ParseBigIntError) -> Self {
         APIError::InvalidValue {
-            description: "Cannot properly parse number into BigInt".into(),
+            description: "cannot properly parse number into BigInt".into(),
         }
     }
 }

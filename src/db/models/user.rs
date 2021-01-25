@@ -35,7 +35,7 @@ impl User {
         Ok(is_match)
     }
 
-    pub fn get_by_id(
+    pub fn get(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: Uuid,
     ) -> Result<User, diesel::result::Error> {
@@ -44,16 +44,17 @@ impl User {
         Ok(result)
     }
 
-    pub fn get_by(
+    pub fn get_active(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
-        public_key: &str,
-        kind: i16,
+        address: &str,
+        kind: UserKind,
         contract_id: Uuid,
     ) -> Result<User, diesel::result::Error> {
         let result: User = users::dsl::users
-            .filter(users::dsl::public_key.eq(public_key))
+            .filter(users::dsl::address.eq(address))
             .filter(users::dsl::contract_id.eq(contract_id))
-            .filter(users::dsl::kind.eq(kind))
+            .filter(users::dsl::kind.eq::<i16>(kind.into()))
+            .filter(users::dsl::state.eq::<i16>(UserState::Active.into()))
             .first(conn)?;
 
         Ok(result)
@@ -61,18 +62,29 @@ impl User {
 
     pub fn get_all(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
-        kind: i16,
-        contract_id: Uuid,
-        state: Option<i16>,
+        kind: Option<UserKind>,
+        contract_id: Option<Uuid>,
+        state: Option<UserState>,
+        address: Option<&String>,
     ) -> Result<Vec<User>, diesel::result::Error> {
         let mut query = users::dsl::users
-            .filter(users::dsl::contract_id.eq(contract_id))
-            .filter(users::dsl::kind.eq(kind))
             .order_by(users::dsl::created_at)
             .into_boxed();
 
+        if let Some(kind) = kind {
+            query = query.filter(users::dsl::kind.eq::<i16>(kind.into()));
+        }
+
+        if let Some(contract_id) = contract_id {
+            query = query.filter(users::dsl::contract_id.eq(contract_id));
+        }
+
         if let Some(state) = state {
-            query = query.filter(users::dsl::state.eq(state))
+            query = query.filter(users::dsl::state.eq::<i16>(state.into()));
+        }
+
+        if let Some(address) = address {
+            query = query.filter(users::dsl::address.eq(address));
         }
 
         let result = query.load(conn)?;
@@ -80,16 +92,17 @@ impl User {
         Ok(result)
     }
 
-    pub fn get_active(
+    pub fn get_all_active(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         contract_id: Uuid,
         kind: UserKind,
     ) -> Result<Vec<User>, diesel::result::Error> {
         User::get_all(
             &conn,
-            kind as i16,
-            contract_id,
-            Some(UserState::Active as i16),
+            Some(kind),
+            Some(contract_id),
+            Some(UserState::Active),
+            None,
         )
     }
 
@@ -103,12 +116,12 @@ impl User {
         limit: i64,
     ) -> Result<(Vec<User>, i64), diesel::result::Error> {
         let mut users_query = users::dsl::users
-            .filter(users::dsl::state.eq(state.unwrap_or(UserState::Active) as i16))
+            .filter(users::dsl::state.eq::<i16>(state.unwrap_or(UserState::Active).into()))
             .order_by(users::dsl::created_at)
             .into_boxed();
 
         if let Some(kind) = kind {
-            users_query = users_query.filter(users::dsl::kind.eq(kind as i16));
+            users_query = users_query.filter(users::dsl::kind.eq::<i16>(kind.into()));
         }
 
         if let Some(contract_id) = contract_id {
@@ -131,7 +144,7 @@ impl User {
         kind: UserKind,
         users: &Vec<SyncUser>,
     ) -> Result<usize, APIError> {
-        let stored_users = User::get_all(conn, kind as i16, contract_id, None)?;
+        let stored_users = User::get_all(conn, Some(kind), Some(contract_id), None, None)?;
 
         let to_deactivate: Vec<_> = stored_users
             .iter()
@@ -165,8 +178,8 @@ impl User {
                 Ok(NewUser {
                     public_key: user.public_key.clone(),
                     address: tezos::edpk_to_tz1(&user.public_key)?,
-                    contract_id: contract_id,
-                    kind: kind as i16,
+                    contract_id,
+                    kind: kind.into(),
                     display_name: user.display_name.clone(),
                     email: user.email.clone(),
                 })
@@ -181,13 +194,14 @@ impl User {
                     .find(|stored_user| stored_user.public_key == user.public_key);
 
                 if let Some(stored_user) = found {
+                    let inactive: i16 = UserState::Inactive.into();
                     let has_changes = stored_user.display_name != user.display_name
                         || stored_user.email != user.email
-                        || stored_user.state == (UserState::Inactive as i16);
+                        || stored_user.state == inactive;
                     if has_changes {
                         Some(UpdateUser {
                             id: stored_user.id,
-                            state: UserState::Active as i16,
+                            state: UserState::Active.into(),
                             display_name: user.display_name.clone(),
                             email: user.email.clone(),
                         })
@@ -205,7 +219,7 @@ impl User {
         if !to_deactivate.is_empty() {
             let deactivated =
                 diesel::update(users::dsl::users.filter(users::dsl::id.eq_any(to_deactivate)))
-                    .set(users::dsl::state.eq(UserState::Inactive as i16))
+                    .set(users::dsl::state.eq::<i16>(UserState::Inactive.into()))
                     .execute(conn)?;
 
             changes += deactivated;

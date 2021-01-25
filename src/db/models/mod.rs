@@ -1,3 +1,4 @@
+pub mod authentication_challenge;
 pub mod contract;
 pub mod operation_approval;
 pub mod operation_request;

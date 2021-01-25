@@ -1,3 +1,4 @@
+pub mod authentication;
 pub mod contracts;
 pub mod models;
 pub mod operation_approvals;

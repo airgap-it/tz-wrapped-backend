@@ -1,25 +1,18 @@
-use std::{
-    convert::{TryFrom, TryInto},
-    str::FromStr,
-};
+use std::convert::{TryFrom, TryInto};
 
 use actix_web::{web, web::Path, web::Query, HttpResponse};
 use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
-use num_bigint::BigInt;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::models::{
-    common::ListResponse,
-    contract::Contract,
-    error::APIError,
-    operation_request::{NewOperationRequest, OperationRequestKind, SignableOperationRequest},
-};
-use crate::db::models::{contract::Contract as DBContract, operation_request::OperationRequest};
+use crate::db::models::contract::Contract as DBContract;
 use crate::settings;
-use crate::tezos;
 use crate::tezos::contract::multisig;
 use crate::DbPool;
+use crate::{
+    api::models::{common::ListResponse, contract::Contract, error::APIError},
+    db::models::operation_request::OperationRequest,
+};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -27,7 +20,7 @@ pub struct Info {
     limit: Option<i64>,
 }
 
-pub async fn get_contracts(
+pub async fn contracts(
     pool: web::Data<DbPool>,
     query: Query<Info>,
 ) -> Result<HttpResponse, APIError> {
@@ -64,94 +57,62 @@ pub struct PathInfo {
     id: Uuid,
 }
 
-pub async fn get_contract(
+pub async fn contract(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
 ) -> Result<HttpResponse, APIError> {
     let conn = pool.get()?;
-    let id = path.id;
+    let contract_id = path.id;
 
-    let contract = web::block(move || DBContract::get_by_id(&conn, id)).await?;
+    let contract = web::block(move || DBContract::get(&conn, &contract_id)).await?;
 
     Ok(HttpResponse::Ok().json(Contract::try_from(contract)?))
 }
 
-pub async fn get_contract_nonce(
+pub async fn contract_nonce(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
     tezos_settings: web::Data<settings::Tezos>,
 ) -> Result<HttpResponse, APIError> {
-    let conn = pool.get()?;
-    let id = path.id;
-
-    let contract =
-        web::block::<_, _, APIError>(move || Ok(DBContract::get_by_id(&conn, id)?)).await?;
-    let mut multisig = multisig::get_multisig(
-        contract.multisig_pkh.as_ref(),
-        contract.kind.try_into()?,
-        tezos_settings.node_url.as_ref(),
-    );
-
-    let multisig_nonce = multisig.nonce().await?;
+    let contract_id = path.id;
+    let multisig_nonce =
+        multisig_nonce(&pool, contract_id, tezos_settings.node_url.as_ref()).await?;
 
     Ok(HttpResponse::Ok().json(multisig_nonce))
 }
 
-#[derive(Deserialize)]
-pub struct SignableInfo {
-    target_address: Option<String>,
-    amount: String,
-    kind: OperationRequestKind,
-}
-
-pub async fn get_signable_message(
+pub async fn next_usable_nonce(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
-    query: Query<SignableInfo>,
     tezos_settings: web::Data<settings::Tezos>,
 ) -> Result<HttpResponse, APIError> {
-    let conn = pool.get()?;
-    let id = path.id;
-    let (contract, max_nonce) = web::block::<_, _, APIError>(move || {
-        let contract = DBContract::get_by_id(&conn, id)?;
-        let max_nonce = OperationRequest::max_nonce(&conn, &contract.id).unwrap_or(-1);
+    let contract_id = path.id;
+    let multisig_nonce =
+        multisig_nonce(&pool, contract_id, tezos_settings.node_url.as_ref()).await?;
 
-        Ok((contract, max_nonce))
+    let conn = pool.get()?;
+    let max_local_nonce = web::block::<_, _, APIError>(move || {
+        Ok(OperationRequest::max_nonce(&conn, &contract_id).unwrap_or(-1))
     })
     .await?;
+
+    let nonce = std::cmp::max(multisig_nonce, max_local_nonce + 1);
+
+    Ok(HttpResponse::Ok().json(nonce))
+}
+
+async fn multisig_nonce(
+    pool: &web::Data<DbPool>,
+    contract_id: Uuid,
+    node_url: &str,
+) -> Result<i64, APIError> {
+    let conn = pool.get()?;
+    let contract = web::block(move || DBContract::get(&conn, &contract_id)).await?;
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
         contract.kind.try_into()?,
-        tezos_settings.node_url.as_ref(),
+        node_url,
     );
 
-    let nonce = std::cmp::max(multisig.nonce().await?, max_nonce + 1);
-    let chain_id = multisig.chain_id().await?;
-    let amount = BigInt::from_str(query.amount.as_ref())?;
-
-    let signable_message = tezos::contract::get_signable_message(
-        &contract,
-        query.kind,
-        query.target_address.as_ref(),
-        amount,
-        nonce,
-        chain_id.as_ref(),
-        &multisig,
-    )
-    .await?;
-
-    let operation_request = NewOperationRequest {
-        contract_id: contract.id,
-        target_address: query.target_address.clone(),
-        amount: query.amount.clone(),
-        kind: query.kind,
-        signature: "".to_owned(),
-        chain_id,
-        nonce: nonce,
-    };
-
-    Ok(HttpResponse::Ok().json(SignableOperationRequest::new(
-        operation_request,
-        signable_message.try_into()?,
-    )))
+    Ok(multisig.nonce().await?)
 }

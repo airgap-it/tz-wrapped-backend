@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use actix_session::Session;
 use actix_web::{
     web,
     web::{Path, Query},
@@ -9,28 +10,39 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::models::{
-    common::ListResponse,
-    error::APIError,
-    user::{User, UserKind, UserState},
-};
 use crate::db::models::user::User as DBUser;
 use crate::DbPool;
+use crate::{
+    api::models::{
+        common::ListResponse,
+        error::APIError,
+        user::{User, UserKind, UserState},
+    },
+    auth::get_current_user,
+};
 
 #[derive(Deserialize)]
 pub struct Info {
     page: Option<i64>,
     limit: Option<i64>,
     kind: Option<UserKind>,
-    contract_id: Option<Uuid>,
+    contract_id: Uuid,
     state: Option<UserState>,
     address: Option<String>,
 }
 
-pub async fn get_users(
+pub async fn users(
     pool: web::Data<DbPool>,
     query: Query<Info>,
+    session: Session,
 ) -> Result<HttpResponse, APIError> {
+    let current_user = get_current_user(&session)?;
+
+    current_user.require_roles(
+        vec![UserKind::Gatekeeper, UserKind::Keyholder],
+        query.contract_id,
+    )?;
+
     let conn = pool.get()?;
 
     let page = query.page.unwrap_or(0);
@@ -42,7 +54,7 @@ pub async fn get_users(
             page,
             limit,
             query.kind,
-            query.contract_id,
+            Some(query.contract_id),
             query.state,
             query.address.as_ref(),
         )
@@ -80,15 +92,21 @@ pub struct PathInfo {
     id: Uuid,
 }
 
-pub async fn get_user(
+pub async fn user(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
+    session: Session,
 ) -> Result<HttpResponse, APIError> {
+    let current_user = get_current_user(&session)?;
+
     let conn = pool.get()?;
-
     let id = path.id;
+    let user = web::block(move || DBUser::get(&conn, id)).await?;
 
-    let user = web::block(move || DBUser::get_by_id(&conn, id)).await?;
+    current_user.require_roles(
+        vec![UserKind::Gatekeeper, UserKind::Keyholder],
+        user.contract_id,
+    )?;
 
     Ok(HttpResponse::Ok().json(User::try_from(user)?))
 }

@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 
+use actix_session::Session;
 use actix_web::{
     web::{self, Path},
     HttpResponse,
@@ -7,36 +8,51 @@ use actix_web::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::models::{
-    error::APIError,
-    operation_request::{OperationRequest, OperationRequestState, PatchOperationRequestBody},
-};
 use crate::db::models::{operation_request::OperationRequest as DBOperationRequest, user::User};
 use crate::tezos::coding::validate_operation_hash;
 use crate::DbPool;
+use crate::{
+    api::models::{
+        error::APIError,
+        operation_request::{OperationRequest, OperationRequestState, PatchOperationRequest},
+        user::UserKind,
+    },
+    auth::get_current_user,
+};
 
 #[derive(Deserialize)]
 pub struct PathInfo {
     id: Uuid,
 }
 
-pub async fn patch_operation(
+pub async fn operation_request(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
-    body: web::Json<PatchOperationRequestBody>,
+    patch_operation_request: web::Json<PatchOperationRequest>,
+    session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let conn = pool.get()?;
-    let id = path.id;
+    let current_user = get_current_user(&session)?;
 
-    validate_operation_hash(&body.operation_hash).map_err(|_error| APIError::InvalidValue {
-        description: format!(
-            "Provided operation hash ({}) is not a valid operation hash",
-            body.operation_hash
-        ),
-    })?;
+    let conn = pool.get()?;
+    let operation_request_id = path.id;
+
+    if let Some(operation_hash) = &patch_operation_request.operation_hash {
+        validate_operation_hash(operation_hash).map_err(|_error| APIError::InvalidValue {
+            description: format!(
+                "Provided operation hash ({}) is not a valid",
+                operation_hash
+            ),
+        })?;
+    }
 
     let (updated_operation, gatekeeper) = web::block::<_, _, APIError>(move || {
-        let operation_request = DBOperationRequest::get_by_id(&conn, &id)?;
+        let operation_request = DBOperationRequest::get(&conn, &operation_request_id)?;
+
+        current_user.require_roles(
+            vec![UserKind::Gatekeeper, UserKind::Keyholder],
+            operation_request.contract_id,
+        )?;
+
         let state: OperationRequestState = operation_request.state.try_into()?;
         if state != OperationRequestState::Approved {
             return Err(APIError::InvalidOperationState {
@@ -47,10 +63,14 @@ pub async fn patch_operation(
                 ),
             });
         }
-        DBOperationRequest::mark_injected(&conn, &id, body.operation_hash.clone())?;
+        DBOperationRequest::mark_injected(
+            &conn,
+            &operation_request_id,
+            patch_operation_request.operation_hash.clone(),
+        )?;
 
-        let updated_operation = DBOperationRequest::get_by_id(&conn, &id)?;
-        let gatekeeper = User::get_by_id(&conn, operation_request.gatekeeper_id)?;
+        let updated_operation = DBOperationRequest::get(&conn, &operation_request_id)?;
+        let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
 
         Ok((updated_operation, gatekeeper))
     })

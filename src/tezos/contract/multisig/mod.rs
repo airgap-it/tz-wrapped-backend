@@ -42,18 +42,6 @@ pub trait Multisig: Send + Sync {
     async fn min_signatures(&mut self) -> Result<i64, TzError>;
     async fn approvers(&mut self) -> Result<&Vec<String>, TzError>;
 
-    async fn chain_id(&self) -> Result<String, TzError> {
-        let url = format!("{}/chains/main/chain_id", self.node_url());
-        let result = reqwest::get(&url)
-            .await
-            .map_err(|_error| TzError::NetworkFailure)?
-            .json::<String>()
-            .await
-            .map_err(|_error| TzError::ParsingFailure)?;
-
-        Ok(result)
-    }
-
     async fn signable_message_for_call(
         &self,
         chain_id: String,

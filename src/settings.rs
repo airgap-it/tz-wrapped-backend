@@ -8,6 +8,7 @@ use crate::api::models::contract::ContractKind;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Server {
     pub address: String,
+    pub domain_name: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -67,7 +68,7 @@ pub struct Settings {
     pub env: ENV,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub enum ENV {
     Development,
     Testing,

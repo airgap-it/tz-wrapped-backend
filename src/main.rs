@@ -2,6 +2,7 @@
 use std::convert::TryInto;
 
 use actix_cors::Cors;
+use actix_session::CookieSession;
 use actix_web::{middleware, web, App, HttpServer, Responder};
 
 #[macro_use]
@@ -13,6 +14,7 @@ extern crate diesel_migrations;
 extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
+extern crate env_logger;
 extern crate lettre;
 extern crate lettre_email;
 extern crate native_tls;
@@ -24,10 +26,12 @@ use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use diesel_migrations::embed_migrations;
 use dotenv::dotenv;
+use settings::ENV;
 use user::SyncUser;
 // use std::env;
 
 mod api;
+mod auth;
 mod crypto;
 mod db;
 mod notifications;
@@ -45,10 +49,10 @@ lazy_static! {
 
 fn database_url() -> String {
     dotenv().ok();
-    let user = &CONFIG.database.user; //env::var("DB_USER").expect("DB_USER must be set");
-    let password = &CONFIG.database.password; // env::var("DB_PASSWORD").expect("DB_PASSWORD must be set");
-    let host = &CONFIG.database.host; // env::var("DB_HOST").expect("DB_HOST must be set");
-    let name = &CONFIG.database.name; // env::var("DB_NAME").expect("DB_NAME must be set");
+    let user = &CONFIG.database.user;
+    let password = &CONFIG.database.password;
+    let host = &CONFIG.database.host;
+    let name = &CONFIG.database.name;
 
     format!("postgres://{}:{}@{}:5432/{}", user, password, host, name)
 }
@@ -59,6 +63,9 @@ async fn index() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info");
+    env_logger::init();
+
     let database_url = database_url();
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool = r2d2::Pool::builder()
@@ -77,12 +84,21 @@ async fn main() -> std::io::Result<()> {
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
 
     HttpServer::new(move || {
+        let session = CookieSession::signed(&[0; 32])
+            .secure(CONFIG.env != ENV::Local)
+            .domain(CONFIG.server.domain_name.clone())
+            .path("/")
+            .http_only(true)
+            .expires_in(86400);
         let cors = Cors::default()
             .allow_any_origin()
             .allow_any_method()
-            .allow_any_header();
+            .allow_any_header()
+            .supports_credentials();
         App::new()
             .data(pool.clone())
+            .wrap(middleware::Logger::default())
+            .wrap(session)
             .wrap(cors)
             .wrap(middleware::Compress::default())
             .route("/", web::get().to(index))
@@ -93,7 +109,9 @@ async fn main() -> std::io::Result<()> {
                     .configure(api::users::api_config)
                     .configure(api::contracts::api_config)
                     .data(CONFIG.contracts.clone())
-                    .configure(api::operation_approvals::api_config),
+                    .configure(api::operation_approvals::api_config)
+                    .data(CONFIG.server.clone())
+                    .configure(api::authentication::api_config),
             )
     })
     .bind(&CONFIG.server.address)?

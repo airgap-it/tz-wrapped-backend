@@ -12,7 +12,6 @@ pub struct User {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub public_key: String,
     pub address: String,
     pub contract_id: Uuid,
     pub kind: UserKind,
@@ -28,7 +27,6 @@ impl TryFrom<DBUser> for User {
             id: value.id,
             created_at: value.created_at,
             updated_at: value.updated_at,
-            public_key: value.public_key,
             address: value.address,
             contract_id: value.contract_id,
             kind: value.kind.try_into()?,
@@ -38,7 +36,7 @@ impl TryFrom<DBUser> for User {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum UserKind {
     Gatekeeper = 0,
@@ -87,6 +85,15 @@ impl Into<&'static str> for UserKind {
 
 impl Into<i64> for UserKind {
     fn into(self) -> i64 {
+        match self {
+            UserKind::Gatekeeper => 0,
+            UserKind::Keyholder => 1,
+        }
+    }
+}
+
+impl Into<i16> for UserKind {
+    fn into(self) -> i16 {
         match self {
             UserKind::Gatekeeper => 0,
             UserKind::Keyholder => 1,
@@ -143,6 +150,15 @@ impl Into<&'static str> for UserState {
 
 impl Into<i64> for UserState {
     fn into(self) -> i64 {
+        match self {
+            UserState::Active => 0,
+            UserState::Inactive => 1,
+        }
+    }
+}
+
+impl Into<i16> for UserState {
+    fn into(self) -> i16 {
         match self {
             UserState::Active => 0,
             UserState::Inactive => 1,

@@ -1,10 +1,10 @@
 use std::convert::TryInto;
 
+use actix_session::Session;
 use actix_web::{web, HttpResponse};
 use multisig::SignableMessage;
 use uuid::Uuid;
 
-use crate::api::models::user::UserKind;
 use crate::api::models::{
     error::APIError,
     operation_approval::{NewOperationApproval, OperationApproval},
@@ -20,15 +20,21 @@ use crate::notifications::notify_min_approvals_received;
 use crate::settings;
 use crate::tezos::contract::{get_signable_message, multisig, multisig::Multisig};
 use crate::DbPool;
+use crate::{api::models::user::UserKind, auth::get_current_user};
 
-pub async fn post_approval(
+pub async fn operation_approval(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
     contract_settings: web::Data<Vec<settings::Contract>>,
     body: web::Json<NewOperationApproval>,
+    session: Session,
 ) -> Result<HttpResponse, APIError> {
+    let current_user = get_current_user(&session)?;
+
     let (operation_request, contract) =
         get_operation_request_and_contract(&pool, body.operation_request_id).await?;
+
+    current_user.require_roles(vec![UserKind::Keyholder], contract.id)?;
 
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
@@ -74,7 +80,7 @@ pub async fn post_approval(
             let result = OperationRequest::mark_approved(&conn, &request_id);
 
             if result.is_ok() {
-                let gatekeeper = User::get_by_id(&conn, operation_request.gatekeeper_id);
+                let gatekeeper = User::get(&conn, operation_request.gatekeeper_id);
                 if let Ok(gatekeeper) = gatekeeper {
                     let _notification_result = notify_min_approvals_received(
                         &gatekeeper,
@@ -156,7 +162,11 @@ async fn find_and_validate_keyholder(
         let _changes =
             User::sync_users(&conn, contract_id, UserKind::Keyholder, keyholders.as_ref())?;
 
-        Ok(User::get_active(&conn, contract_id, UserKind::Keyholder)?)
+        Ok(User::get_all_active(
+            &conn,
+            contract_id,
+            UserKind::Keyholder,
+        )?)
     })
     .await?;
 
@@ -181,7 +191,7 @@ async fn get_operation_request_and_contract(
     let conn = pool.get()?;
 
     let result: (OperationRequest, Contract) =
-        web::block(move || OperationRequest::get_by_id_with_contract(&conn, &operation_request_id))
+        web::block(move || OperationRequest::get_with_contract(&conn, &operation_request_id))
             .await?;
 
     Ok(result)

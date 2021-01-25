@@ -25,7 +25,6 @@ pub struct OperationRequest {
     pub target_address: Option<String>,
     pub amount: String,
     pub kind: OperationRequestKind,
-    pub signature: String,
     pub chain_id: String,
     pub nonce: i64,
     pub state: OperationRequestState,
@@ -46,7 +45,6 @@ impl OperationRequest {
             target_address: operation.target_address,
             amount: operation.amount.to_string(),
             kind: operation.kind.try_into()?,
-            signature: operation.signature,
             chain_id: operation.chain_id,
             nonce: operation.nonce,
             state: operation.state.try_into()?,
@@ -61,14 +59,11 @@ pub struct NewOperationRequest {
     pub target_address: Option<String>,
     pub amount: String,
     pub kind: OperationRequestKind,
-    pub signature: String,
-    pub chain_id: String,
-    pub nonce: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PatchOperationRequestBody {
-    pub operation_hash: String,
+pub struct PatchOperationRequest {
+    pub operation_hash: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
