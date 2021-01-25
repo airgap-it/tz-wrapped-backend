@@ -1,3 +1,4 @@
+pub mod authentication;
 pub mod common;
 pub mod contract;
 pub mod error;

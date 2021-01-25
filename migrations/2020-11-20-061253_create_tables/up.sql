@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS operation_requests (
     target_address      VARCHAR DEFAULT NULL,
     amount              NUMERIC(1000, 0) NOT NULL,
     kind                SMALLINT NOT NULL,
-    signature           VARCHAR NOT NULL,
     chain_id            VARCHAR NOT NULL,
     nonce               BIGINT NOT NULL,
     state               SMALLINT NOT NULL DEFAULT 0,
@@ -62,4 +61,14 @@ CREATE TABLE IF NOT EXISTS operation_approvals (
     UNIQUE(keyholder_id, operation_request_id),
     FOREIGN KEY(keyholder_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(operation_request_id) REFERENCES operation_requests(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS authentication_challenges (
+    id                  uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP + (5 * interval '1 minute'),
+    address             VARCHAR NOT NULL,
+    challenge           VARCHAR NOT NULL,
+    state               SMALLINT NOT NULL DEFAULT 0
 );

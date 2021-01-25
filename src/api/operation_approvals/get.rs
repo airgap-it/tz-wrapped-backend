@@ -1,3 +1,4 @@
+use actix_session::Session;
 use actix_web::{
     web,
     web::{Path, Query},
@@ -7,11 +8,18 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::models::{
-    common::ListResponse, error::APIError, operation_approval::OperationApproval,
-};
-use crate::db::models::{operation_approval::OperationApproval as DBOperationApproval, user::User};
 use crate::DbPool;
+use crate::{
+    api::models::user::UserKind,
+    db::models::{
+        operation_approval::OperationApproval as DBOperationApproval,
+        operation_request::OperationRequest, user::User,
+    },
+};
+use crate::{
+    api::models::{common::ListResponse, error::APIError, operation_approval::OperationApproval},
+    auth::get_current_user,
+};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -20,19 +28,29 @@ pub struct Info {
     limit: Option<i64>,
 }
 
-pub async fn get_approvals(
+pub async fn operation_approvals(
     pool: web::Data<DbPool>,
     query: Query<Info>,
+    session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let conn = pool.get().map_err(|error| APIError::DBError {
-        description: error.to_string(),
-    })?;
+    let current_user = get_current_user(&session)?;
+
+    let conn = pool.get()?;
+    let operation_request_id = query.operation_request_id;
+    let operation_request =
+        web::block(move || OperationRequest::get(&conn, &operation_request_id)).await?;
+
+    current_user.require_roles(
+        vec![UserKind::Gatekeeper, UserKind::Keyholder],
+        operation_request.contract_id,
+    )?;
 
     let page = query.page.unwrap_or(0);
     let limit = query.limit.unwrap_or(10);
-    let request_id = query.operation_request_id;
 
-    let result = web::block(move || load_approvals(&conn, request_id, page, limit)).await?;
+    let conn = pool.get()?;
+    let result =
+        web::block(move || load_approvals(&conn, operation_request_id, page, limit)).await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
@@ -62,16 +80,26 @@ pub struct PathInfo {
     id: Uuid,
 }
 
-pub async fn get_approval(
+pub async fn operation_approval(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
+    session: Session,
 ) -> Result<HttpResponse, APIError> {
+    let current_user = get_current_user(&session)?;
+
     let conn = pool.get()?;
     let id = path.id;
 
     let approval = web::block::<_, _, APIError>(move || {
-        let approval = DBOperationApproval::get_by_id(&conn, id)?;
-        let keyholder = User::get_by_id(&conn, approval.keyholder_id)?;
+        let approval = DBOperationApproval::get(&conn, id)?;
+        let operation_request = OperationRequest::get(&conn, &approval.operation_request_id)?;
+
+        current_user.require_roles(
+            vec![UserKind::Gatekeeper, UserKind::Keyholder],
+            operation_request.contract_id,
+        )?;
+
+        let keyholder = User::get(&conn, approval.keyholder_id)?;
 
         Ok((approval, keyholder))
     })

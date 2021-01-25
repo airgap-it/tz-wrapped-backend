@@ -1,5 +1,5 @@
 [tezos]
-node_url = "https://delphinet-tezos.giganode.io"
+node_url = "https://testnet-tezos.giganode.io"
 
 [[contracts]]
 address = "KT1Q66HBBQYaHGAKnxeuedkgLyJYF9jkD96H"

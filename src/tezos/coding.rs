@@ -40,12 +40,16 @@ pub fn decode(
 pub fn validate_value(value: &str, info: EncodingInfo) -> Result<(), TzError> {
     let (_, decoded) = value
         .from_base58check()
-        .map_err(|_error| TzError::InvalidArgument)?;
+        .map_err(|_error| TzError::InvalidValue {
+            description: format!("{} is not a valid value for type {}", value, info.prefix()),
+        })?;
     let prefix = info.prefix_bytes();
     if decoded.len() != (info.bytes_length + prefix.len())
         || !decoded.starts_with(info.prefix_bytes())
     {
-        return Err(TzError::InvalidType);
+        return Err(TzError::InvalidValue {
+            description: format!("{} is not a valid value for type {}", value, info.prefix()),
+        });
     }
     Ok(())
 }
@@ -188,12 +192,16 @@ pub struct EncodingInfo {
 }
 
 impl EncodingInfo {
-    fn version(&self) -> u8 {
+    pub fn version(&self) -> u8 {
         self.versioned_prefix[0]
     }
 
-    fn prefix_bytes(&self) -> &'static [u8] {
+    pub fn prefix_bytes(&self) -> &'static [u8] {
         &self.versioned_prefix[1..]
+    }
+
+    pub fn prefix(&self) -> &str {
+        self.prefix.prefix()
     }
 }
 

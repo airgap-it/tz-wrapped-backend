@@ -8,32 +8,34 @@ edition = "2018"
 
 [dependencies]
 actix-web = "3"
-sodiumoxide = "0.2.6"
-actix-cors = "0.5.2"
+sodiumoxide = "0.2"
+actix-cors = "0.5"
+actix-session = "0.4"
 diesel = { version = "1.4", features = ["postgres", "uuidv07", "r2d2", "chrono", "numeric"] }
 diesel_migrations = "1.4"
-dotenv = "0.15.0"
-r2d2 = "0.8.9"
+dotenv = "0.15"
+env_logger = "0.8"
+r2d2 = "0.8"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-serde = "1.0.117"
+serde = "1.0"
 serde_json = { version = "1.0", features = ["preserve_order"] }
-derive_more = "0.99.11"
-base58check = "0.1.0"
-bs58 = "0.4.0"
-hex = "0.4.2"
-radix_fmt = "1.0.0"
+derive_more = "0.99"
+base58check = "0.1"
+bs58 = "0.4"
+hex = "0.4"
+radix_fmt = "1.0"
 num-traits = "0.2"
 num-derive = "0.3"
 num-bigint = "0.2"
 bigdecimal = "0.1"
-reqwest = { version = "0.10.9", features = ["json"] }
-config = "0.10.1"
-lazy_static = "1.4.0"
+reqwest = { version = "0.10", features = ["json"] }
+config = "0.10"
+lazy_static = "1.4"
 lettre = "0.9"
 lettre_email = "0.9"
 native-tls = "0.2"
-async-trait = "0.1.42"
+async-trait = "0.1"
 
 [dev-dependencies]
 actix-rt = "*"

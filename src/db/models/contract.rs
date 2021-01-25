@@ -25,9 +25,9 @@ pub struct Contract {
 }
 
 impl Contract {
-    pub fn get_by_id(
+    pub fn get(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
-        id: Uuid,
+        id: &Uuid,
     ) -> Result<Contract, diesel::result::Error> {
         let result: Contract = contracts::dsl::contracts.find(id).first(conn)?;
 
@@ -107,7 +107,7 @@ impl Contract {
                 pkh: contract.address.clone(),
                 token_id: contract.token_id as i32,
                 multisig_pkh: contract.multisig.clone(),
-                kind: contract.kind as i16,
+                kind: contract.kind.into(),
                 display_name: contract.name.clone(),
                 min_approvals,
                 decimals: contract.decimals,
@@ -125,16 +125,17 @@ impl Contract {
                 let mut multisig =
                     multisig::get_multisig(&contract.multisig, contract.kind, node_url);
                 let min_approvals = multisig.min_signatures().await? as i32;
+                let contract_kind_i16: i16 = contract.kind.into();
                 let has_changes = stored_contract.multisig_pkh != contract.multisig
                     || stored_contract.display_name != contract.name
-                    || stored_contract.kind != (contract.kind as i16)
+                    || stored_contract.kind != contract_kind_i16
                     || stored_contract.min_approvals != min_approvals
                     || stored_contract.decimals != contract.decimals;
                 if has_changes {
                     to_update.push(UpdateContract {
                         id: stored_contract.id,
                         multisig_pkh: contract.multisig.clone(),
-                        kind: contract.kind as i16,
+                        kind: contract.kind.into(),
                         display_name: contract.name.clone(),
                         min_approvals,
                     })

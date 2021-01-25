@@ -32,7 +32,7 @@ impl OperationApproval {
         Ok(count)
     }
 
-    pub fn get_by_id(
+    pub fn get(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: Uuid,
     ) -> Result<OperationApproval, diesel::result::Error> {

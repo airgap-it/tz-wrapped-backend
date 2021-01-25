@@ -75,3 +75,12 @@ impl TryFrom<&str> for ContractKind {
         }
     }
 }
+
+impl Into<i16> for ContractKind {
+    fn into(self) -> i16 {
+        match self {
+            ContractKind::FA1 => 0,
+            ContractKind::FA2 => 1,
+        }
+    }
+}

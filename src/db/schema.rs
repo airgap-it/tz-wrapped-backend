@@ -1,4 +1,16 @@
 table! {
+    authentication_challenges (id) {
+        id -> Uuid,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+        expires_at -> Timestamp,
+        address -> Varchar,
+        challenge -> Varchar,
+        state -> Int2,
+    }
+}
+
+table! {
     contracts (id) {
         id -> Uuid,
         created_at -> Timestamp,
@@ -34,7 +46,6 @@ table! {
         target_address -> Nullable<Varchar>,
         amount -> Numeric,
         kind -> Int2,
-        signature -> Varchar,
         chain_id -> Varchar,
         nonce -> Int8,
         state -> Int2,
@@ -64,6 +75,7 @@ joinable!(operation_requests -> users (gatekeeper_id));
 joinable!(users -> contracts (contract_id));
 
 allow_tables_to_appear_in_same_query!(
+    authentication_challenges,
     contracts,
     operation_approvals,
     operation_requests,

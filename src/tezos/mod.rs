@@ -14,6 +14,7 @@ pub enum TzError {
     InvalidIndex,
     InvalidType,
     InvalidArgument,
+    InvalidValue { description: String },
     NetworkFailure,
     ParsingFailure,
     InvalidPublicKey,
@@ -35,10 +36,6 @@ impl From<num_bigint::ParseBigIntError> for TzError {
 }
 
 pub fn edsig_to_bytes(signature: &str) -> Result<[u8; sign::SIGNATUREBYTES], TzError> {
-    if !signature.starts_with("edsig") {
-        return Err(TzError::InvalidSignature);
-    }
-
     let (_version, decoded) = signature
         .from_base58check()
         .map_err(|_error| TzError::InvalidSignature)?;
@@ -86,4 +83,16 @@ pub fn edpk_to_tz1(pk: &str) -> Result<String, TzError> {
     result.extend_from_slice(hash.as_ref());
 
     Ok(result.to_base58check(6))
+}
+
+pub async fn chain_id(node_url: &str) -> Result<String, TzError> {
+    let url = format!("{}/chains/main/chain_id", node_url);
+    let result = reqwest::get(&url)
+        .await
+        .map_err(|_error| TzError::NetworkFailure)?
+        .json::<String>()
+        .await
+        .map_err(|_error| TzError::ParsingFailure)?;
+
+    Ok(result)
 }

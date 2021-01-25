@@ -1,5 +1,8 @@
+[server]
+domain_name = "localhost"
+
 [tezos]
-node_url = "https://delphinet-tezos.giganode.io"
+node_url = "https://testnet-tezos.giganode.io"
 
 [database]
 host = "localhost"

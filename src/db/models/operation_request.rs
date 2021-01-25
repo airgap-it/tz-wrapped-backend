@@ -3,7 +3,10 @@ use chrono::NaiveDateTime;
 use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
 use uuid::Uuid;
 
-use crate::{api::models::operation_request::OperationRequestKind, db::schema::*};
+use crate::{
+    api::models::operation_request::OperationRequestKind,
+    db::schema::{contracts, operation_requests, users},
+};
 use crate::{
     api::models::operation_request::OperationRequestState,
     db::models::{contract::Contract, user::User},
@@ -23,7 +26,6 @@ pub struct OperationRequest {
     pub target_address: Option<String>,
     pub amount: BigDecimal,
     pub kind: i16,
-    pub signature: String,
     pub chain_id: String,
     pub nonce: i64,
     pub state: i16,
@@ -31,22 +33,20 @@ pub struct OperationRequest {
 }
 
 impl OperationRequest {
-    pub fn get_by_id(
+    pub fn get(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: &Uuid,
     ) -> Result<OperationRequest, diesel::result::Error> {
-        let result: OperationRequest = operation_requests::dsl::operation_requests
-            .find(id)
-            .first(conn)?;
+        let result: OperationRequest = operation_requests::table.find(id).first(conn)?;
 
         Ok(result)
     }
 
-    pub fn get_by_id_with_contract(
+    pub fn get_with_contract(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: &Uuid,
     ) -> Result<(OperationRequest, Contract), diesel::result::Error> {
-        operation_requests::dsl::operation_requests
+        operation_requests::table
             .find(id)
             .inner_join(contracts::table)
             .first(conn)
@@ -56,8 +56,8 @@ impl OperationRequest {
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: &Uuid,
     ) -> Result<(), diesel::result::Error> {
-        let _result = diesel::update(operation_requests::dsl::operation_requests.find(id))
-            .set(operation_requests::dsl::state.eq(OperationRequestState::Approved as i16))
+        let _result = diesel::update(operation_requests::table.find(id))
+            .set(operation_requests::dsl::state.eq::<i16>(OperationRequestState::Approved.into()))
             .execute(conn)?;
 
         Ok(())
@@ -66,12 +66,12 @@ impl OperationRequest {
     pub fn mark_injected(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: &Uuid,
-        operation_hash: String,
+        operation_hash: Option<String>,
     ) -> Result<(), diesel::result::Error> {
-        let _result = diesel::update(operation_requests::dsl::operation_requests.find(id))
+        let _result = diesel::update(operation_requests::table.find(id))
             .set((
-                operation_requests::dsl::state.eq(OperationRequestState::Injected as i16),
-                operation_requests::dsl::operation_hash.eq(Some(operation_hash)),
+                operation_requests::dsl::state.eq::<i16>(OperationRequestState::Injected.into()),
+                operation_requests::dsl::operation_hash.eq(operation_hash),
             ))
             .execute(conn)?;
 
@@ -82,7 +82,7 @@ impl OperationRequest {
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         contract_id: &Uuid,
     ) -> Result<i64, diesel::result::Error> {
-        let op: OperationRequest = operation_requests::dsl::operation_requests
+        let op: OperationRequest = operation_requests::table
             .filter(operation_requests::dsl::contract_id.eq(contract_id))
             .order_by(operation_requests::dsl::nonce.desc())
             .first(conn)?;
@@ -90,20 +90,40 @@ impl OperationRequest {
         Ok(op.nonce as i64)
     }
 
-    pub fn approvals(
+    pub fn operation_approvals(
         &self,
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Result<Vec<(OperationApproval, User)>, diesel::result::Error> {
         OperationApproval::belonging_to(self)
-            .inner_join(users::dsl::users)
+            .inner_join(users::table)
             .load::<(OperationApproval, User)>(conn)
+    }
+
+    pub fn delete_and_fix_next_nonces(
+        &self,
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+    ) -> Result<(), diesel::result::Error> {
+        conn.transaction::<_, diesel::result::Error, _>(|| {
+            Self::delete(conn, &self.id)?;
+            let updated_operation_requests: Vec<OperationRequest> = diesel::update(
+                operation_requests::table.filter(operation_requests::dsl::nonce.gt(self.nonce)),
+            )
+            .set(operation_requests::dsl::nonce.eq(operation_requests::dsl::nonce - 1))
+            .get_results(conn)?;
+
+            let _ = diesel::delete(OperationApproval::belonging_to(&updated_operation_requests))
+                .execute(conn)?;
+            Ok(())
+        })?;
+
+        Ok(())
     }
 
     pub fn insert(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         new_operation_request: &NewOperationRequest,
     ) -> Result<OperationRequest, diesel::result::Error> {
-        diesel::insert_into(operation_requests::dsl::operation_requests)
+        diesel::insert_into(operation_requests::table)
             .values(new_operation_request)
             .get_result(conn)
     }
@@ -116,20 +136,28 @@ impl OperationRequest {
         page: i64,
         limit: i64,
     ) -> Result<(Vec<(OperationRequest, User)>, i64), diesel::result::Error> {
-        let mut query = operation_requests::dsl::operation_requests
-            .filter(operation_requests::dsl::kind.eq(kind as i16))
+        let mut query = operation_requests::table
+            .filter(operation_requests::dsl::kind.eq::<i16>(kind.into()))
             .filter(operation_requests::dsl::contract_id.eq(contract_id))
             .order_by(operation_requests::dsl::created_at)
             .inner_join(users::table)
             .into_boxed();
 
         if let Some(state) = state {
-            query = query.filter(operation_requests::dsl::state.eq(state as i16));
+            query = query.filter(operation_requests::dsl::state.eq::<i16>(state.into()));
         }
 
         let query = query.paginate(page).per_page(limit);
 
         query.load_and_count_pages::<(OperationRequest, User)>(&conn)
+    }
+
+    pub fn delete(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        id: &Uuid,
+    ) -> Result<(), diesel::result::Error> {
+        diesel::delete(operation_requests::table.find(id)).execute(conn)?;
+        Ok(())
     }
 }
 
@@ -141,7 +169,6 @@ pub struct NewOperationRequest {
     pub target_address: Option<String>,
     pub amount: BigDecimal,
     pub kind: i16,
-    pub signature: String,
     pub chain_id: String,
     pub nonce: i64,
 }
