@@ -3,7 +3,7 @@ use std::convert::TryInto;
 
 use actix_cors::Cors;
 use actix_session::CookieSession;
-use actix_web::{middleware, web, App, HttpServer, Responder};
+use actix_web::{cookie::SameSite, middleware, web, App, HttpServer, Responder};
 
 #[macro_use]
 extern crate diesel;
@@ -20,6 +20,7 @@ extern crate lettre_email;
 extern crate native_tls;
 
 use api::models::{error::APIError, user::UserKind};
+use crypto::generate_random_bytes;
 use db::models::contract;
 use db::models::user;
 use diesel::pg::PgConnection;
@@ -83,12 +84,20 @@ async fn main() -> std::io::Result<()> {
         .await
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
 
+    let key = generate_random_bytes(32);
     HttpServer::new(move || {
-        let session = CookieSession::signed(&[0; 32])
-            .secure(CONFIG.env != ENV::Local)
+        let secure = CONFIG.env != ENV::Local;
+        let same_site = if CONFIG.env == ENV::Production || !secure {
+            SameSite::Lax
+        } else {
+            SameSite::None // this allows to run the frontend on localhost and connect to the DEV instance
+        };
+        let session = CookieSession::private(&key)
+            .secure(secure)
             .domain(CONFIG.server.domain_name.clone())
             .path("/")
             .http_only(true)
+            .same_site(same_site)
             .expires_in(86400);
         let cors = Cors::default()
             .allow_any_origin()
