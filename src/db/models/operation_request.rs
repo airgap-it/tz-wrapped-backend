@@ -9,10 +9,10 @@ use crate::{
 };
 use crate::{
     api::models::operation_request::OperationRequestState,
-    db::models::{contract::Contract, user::User},
+    db::models::{contract::Contract, operation_approval::OperationApproval, user::User},
 };
 
-use super::{operation_approval::OperationApproval, pagination::Paginate};
+use super::pagination::Paginate;
 
 #[derive(Queryable, Identifiable, Associations, Debug)]
 #[belongs_to(User, foreign_key = "gatekeeper_id")]
@@ -105,14 +105,28 @@ impl OperationRequest {
     ) -> Result<(), diesel::result::Error> {
         conn.transaction::<_, diesel::result::Error, _>(|| {
             Self::delete(conn, &self.id)?;
+
             let updated_operation_requests: Vec<OperationRequest> = diesel::update(
-                operation_requests::table.filter(operation_requests::dsl::nonce.gt(self.nonce)),
+                operation_requests::table
+                    .filter(operation_requests::dsl::nonce.gt(self.nonce))
+                    .filter(operation_requests::dsl::contract_id.eq(self.contract_id))
+                    .filter(
+                        operation_requests::dsl::state
+                            .ne::<i16>(OperationRequestState::Injected.into()),
+                    ),
             )
-            .set(operation_requests::dsl::nonce.eq(operation_requests::dsl::nonce - 1))
+            .set((
+                operation_requests::dsl::nonce.eq(operation_requests::dsl::nonce - 1),
+                operation_requests::dsl::state.eq::<i16>(OperationRequestState::Open.into()),
+            ))
             .get_results(conn)?;
 
-            let _ = diesel::delete(OperationApproval::belonging_to(&updated_operation_requests))
-                .execute(conn)?;
+            if !updated_operation_requests.is_empty() {
+                let _ =
+                    diesel::delete(OperationApproval::belonging_to(&updated_operation_requests))
+                        .execute(conn)?;
+            }
+
             Ok(())
         })?;
 

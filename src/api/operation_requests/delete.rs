@@ -61,8 +61,9 @@ pub async fn operation_request(
         web::block(move || OperationRequest::delete(&conn, &operation_request.id)).await?;
         return Ok(HttpResponse::Ok().status(StatusCode::NO_CONTENT).finish());
     }
+
     let conn = pool.get()?;
-    operation_request.delete_and_fix_next_nonces(&conn)?;
+    web::block(move || operation_request.delete_and_fix_next_nonces(&conn)).await?;
 
     return Ok(HttpResponse::Ok().status(StatusCode::NO_CONTENT).finish());
 }
