@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS operation_requests (
     state               SMALLINT NOT NULL DEFAULT 0,
     operation_hash      VARCHAR DEFAULT NULL,
 
+    UNIQUE(contract_id, nonce),
     FOREIGN KEY(gatekeeper_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(contract_id) REFERENCES contracts(id) ON DELETE CASCADE
 );
