@@ -8,12 +8,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::db::models::{
+    operation_approval::OperationApproval as DBOperationApproval,
     operation_request::OperationRequest as DBOperationRequest, user::User as DBUser,
 };
 
-use super::common::SignableMessageInfo;
 use super::error::APIError;
 use super::user::User;
+use super::{common::SignableMessageInfo, operation_approval::OperationApproval};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OperationRequest {
@@ -28,27 +29,35 @@ pub struct OperationRequest {
     pub chain_id: String,
     pub nonce: i64,
     pub state: OperationRequestState,
+    pub operation_approvals: Vec<OperationApproval>,
     pub operation_hash: Option<String>,
 }
 
 impl OperationRequest {
     pub fn from(
-        operation: DBOperationRequest,
+        operation_request: DBOperationRequest,
         gatekeeper: DBUser,
+        operation_approvals: Vec<(DBOperationApproval, DBUser)>,
     ) -> Result<OperationRequest, APIError> {
         Ok(OperationRequest {
-            id: operation.id,
-            created_at: operation.created_at,
-            updated_at: operation.updated_at,
+            id: operation_request.id,
+            created_at: operation_request.created_at,
+            updated_at: operation_request.updated_at,
             gatekeeper: gatekeeper.try_into()?,
-            contract_id: operation.contract_id,
-            target_address: operation.target_address,
-            amount: operation.amount.to_string(),
-            kind: operation.kind.try_into()?,
-            chain_id: operation.chain_id,
-            nonce: operation.nonce,
-            state: operation.state.try_into()?,
-            operation_hash: operation.operation_hash,
+            contract_id: operation_request.contract_id,
+            target_address: operation_request.target_address,
+            amount: operation_request.amount.to_string(),
+            kind: operation_request.kind.try_into()?,
+            chain_id: operation_request.chain_id,
+            nonce: operation_request.nonce,
+            state: operation_request.state.try_into()?,
+            operation_approvals: operation_approvals
+                .into_iter()
+                .map(|(operation_approval, keyholder)| {
+                    OperationApproval::from(operation_approval, keyholder)
+                })
+                .collect::<Result<Vec<OperationApproval>, APIError>>()?,
+            operation_hash: operation_request.operation_hash,
         })
     }
 }

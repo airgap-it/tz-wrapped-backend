@@ -126,7 +126,7 @@ fn store_operation(
 ) -> Result<OperationRequest, APIError> {
     let inserted_operation_request = DBOperationRequest::insert(conn, new_operation_request)?;
     let gatekeeper = User::get(conn, inserted_operation_request.gatekeeper_id)?;
-    let result = OperationRequest::from(inserted_operation_request, gatekeeper)?;
+    let result = OperationRequest::from(inserted_operation_request, gatekeeper, vec![])?;
 
     Ok(result)
 }

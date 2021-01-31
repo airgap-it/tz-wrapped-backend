@@ -37,9 +37,16 @@ impl OperationRequest {
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: &Uuid,
     ) -> Result<OperationRequest, diesel::result::Error> {
-        let result: OperationRequest = operation_requests::table.find(id).first(conn)?;
+        operation_requests::table.find(id).first(conn)
+    }
 
-        Ok(result)
+    pub fn get_with_operation_approvals(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        id: &Uuid,
+    ) -> Result<(OperationRequest, Vec<(OperationApproval, User)>), diesel::result::Error> {
+        let operation_request: OperationRequest = operation_requests::table.find(id).first(conn)?;
+        let operation_approvals = operation_request.operation_approvals(conn)?;
+        Ok((operation_request, operation_approvals))
     }
 
     pub fn get_with_contract(
@@ -149,7 +156,13 @@ impl OperationRequest {
         state: Option<OperationRequestState>,
         page: i64,
         limit: i64,
-    ) -> Result<(Vec<(OperationRequest, User)>, i64), diesel::result::Error> {
+    ) -> Result<
+        (
+            Vec<(OperationRequest, User, Vec<(OperationApproval, User)>)>,
+            i64,
+        ),
+        diesel::result::Error,
+    > {
         let mut query = operation_requests::table
             .filter(operation_requests::dsl::kind.eq::<i16>(kind.into()))
             .filter(operation_requests::dsl::contract_id.eq(contract_id))
@@ -163,7 +176,47 @@ impl OperationRequest {
 
         let query = query.paginate(page).per_page(limit);
 
-        query.load_and_count_pages::<(OperationRequest, User)>(&conn)
+        let (result, page_count) = query.load_and_count_pages::<(OperationRequest, User)>(&conn)?;
+
+        let (operation_requests, users): (Vec<OperationRequest>, Vec<User>) =
+            result.into_iter().unzip();
+
+        let operation_approvals: Vec<OperationApproval> =
+            OperationApproval::belonging_to(&operation_requests).load(conn)?;
+        let keyholders: Vec<User> = User::get_all_with_ids(
+            conn,
+            operation_approvals
+                .iter()
+                .map(|operation_approval| &operation_approval.keyholder_id)
+                .collect(),
+        )?;
+        let operation_approvals_and_keyholders: Vec<(OperationApproval, User)> =
+            operation_approvals
+                .into_iter()
+                .map(|operation_approval| {
+                    let keyholder = keyholders
+                        .iter()
+                        .find(|keyholder| keyholder.id == operation_approval.keyholder_id)
+                        .unwrap();
+
+                    (operation_approval, keyholder.clone())
+                })
+                .collect();
+        let grouped_operation_approvals: Vec<Vec<(OperationApproval, User)>> =
+            operation_approvals_and_keyholders.grouped_by(&operation_requests);
+
+        let operation_requests_and_users: Vec<(OperationRequest, User)> =
+            operation_requests.into_iter().zip(users).collect();
+        let result: Vec<(OperationRequest, User, Vec<(OperationApproval, User)>)> =
+            operation_requests_and_users
+                .into_iter()
+                .zip(grouped_operation_approvals)
+                .map(|((operation_request, user), operation_approvals)| {
+                    (operation_request, user, operation_approvals)
+                })
+                .collect();
+
+        Ok((result, page_count))
     }
 
     pub fn delete(

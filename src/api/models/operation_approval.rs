@@ -11,7 +11,7 @@ use crate::db::models::{
 use super::error::APIError;
 use super::user::User;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct OperationApproval {
     pub id: Uuid,
     pub created_at: NaiveDateTime,

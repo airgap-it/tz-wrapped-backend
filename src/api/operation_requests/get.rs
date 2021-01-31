@@ -72,12 +72,14 @@ fn load_operation_requests(
     contract_id: Uuid,
     state: Option<OperationRequestState>,
 ) -> Result<ListResponse<OperationRequest>, APIError> {
-    let (operations_with_gatekeepers, total_pages) =
+    let (operation_requests, total_pages) =
         DBOperationRequest::get_list(conn, kind, contract_id, state, page, limit)?;
 
-    let results = operations_with_gatekeepers
+    let results = operation_requests
         .into_iter()
-        .map(|op| OperationRequest::from(op.0, op.1))
+        .map(|(operation_request, gatekeeper, operation_approvals)| {
+            OperationRequest::from(operation_request, gatekeeper, operation_approvals)
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(ListResponse {
@@ -126,21 +128,27 @@ pub async fn operation_request(
     let conn = pool.get()?;
     let id = path.id;
 
-    let (operation_request, gatekeeper) = web::block::<_, _, APIError>(move || {
-        let operation_request = DBOperationRequest::get(&conn, &id)?;
+    let (operation_request, gatekeeper, operation_approvals) =
+        web::block::<_, _, APIError>(move || {
+            let (operation_request, operation_approvals) =
+                DBOperationRequest::get_with_operation_approvals(&conn, &id)?;
 
-        current_user.require_roles(
-            vec![UserKind::Gatekeeper, UserKind::Keyholder],
-            operation_request.contract_id,
-        )?;
+            current_user.require_roles(
+                vec![UserKind::Gatekeeper, UserKind::Keyholder],
+                operation_request.contract_id,
+            )?;
 
-        let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
 
-        Ok((operation_request, gatekeeper))
-    })
-    .await?;
+            Ok((operation_request, gatekeeper, operation_approvals))
+        })
+        .await?;
 
-    Ok(HttpResponse::Ok().json(OperationRequest::from(operation_request, gatekeeper)?))
+    Ok(HttpResponse::Ok().json(OperationRequest::from(
+        operation_request,
+        gatekeeper,
+        operation_approvals,
+    )?))
 }
 
 pub async fn signable_message(
