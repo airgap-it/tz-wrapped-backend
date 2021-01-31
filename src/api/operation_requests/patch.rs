@@ -45,36 +45,42 @@ pub async fn operation_request(
         })?;
     }
 
-    let (updated_operation, gatekeeper) = web::block::<_, _, APIError>(move || {
-        let operation_request = DBOperationRequest::get(&conn, &operation_request_id)?;
+    let (updated_operation, gatekeeper, operation_approvals) =
+        web::block::<_, _, APIError>(move || {
+            let (operation_request, operation_approvals) =
+                DBOperationRequest::get_with_operation_approvals(&conn, &operation_request_id)?;
 
-        current_user.require_roles(
-            vec![UserKind::Gatekeeper, UserKind::Keyholder],
-            operation_request.contract_id,
-        )?;
+            current_user.require_roles(
+                vec![UserKind::Gatekeeper, UserKind::Keyholder],
+                operation_request.contract_id,
+            )?;
 
-        let state: OperationRequestState = operation_request.state.try_into()?;
-        if state != OperationRequestState::Approved {
-            return Err(APIError::InvalidOperationState {
-                description: format!(
-                    "Expected '{}', found '{}'",
-                    OperationRequestState::Approved,
-                    state
-                ),
-            });
-        }
-        DBOperationRequest::mark_injected(
-            &conn,
-            &operation_request_id,
-            patch_operation_request.operation_hash.clone(),
-        )?;
+            let state: OperationRequestState = operation_request.state.try_into()?;
+            if state != OperationRequestState::Approved {
+                return Err(APIError::InvalidOperationState {
+                    description: format!(
+                        "Expected '{}', found '{}'",
+                        OperationRequestState::Approved,
+                        state
+                    ),
+                });
+            }
+            DBOperationRequest::mark_injected(
+                &conn,
+                &operation_request_id,
+                patch_operation_request.operation_hash.clone(),
+            )?;
 
-        let updated_operation = DBOperationRequest::get(&conn, &operation_request_id)?;
-        let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let updated_operation = DBOperationRequest::get(&conn, &operation_request_id)?;
+            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
 
-        Ok((updated_operation, gatekeeper))
-    })
-    .await?;
+            Ok((updated_operation, gatekeeper, operation_approvals))
+        })
+        .await?;
 
-    Ok(HttpResponse::Ok().json(OperationRequest::from(updated_operation, gatekeeper)?))
+    Ok(HttpResponse::Ok().json(OperationRequest::from(
+        updated_operation,
+        gatekeeper,
+        operation_approvals,
+    )?))
 }

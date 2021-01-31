@@ -12,7 +12,7 @@ use crate::tezos;
 
 use super::pagination::Paginate;
 
-#[derive(Queryable, Identifiable, Debug)]
+#[derive(Queryable, Identifiable, Debug, Clone)]
 pub struct User {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
@@ -40,6 +40,15 @@ impl User {
         id: Uuid,
     ) -> Result<User, diesel::result::Error> {
         let result: User = users::dsl::users.find(id).first(conn)?;
+
+        Ok(result)
+    }
+
+    pub fn get_all_with_ids(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        ids: Vec<&Uuid>,
+    ) -> Result<Vec<User>, diesel::result::Error> {
+        let result: Vec<User> = users::table.filter(users::dsl::id.eq_any(ids)).load(conn)?;
 
         Ok(result)
     }
