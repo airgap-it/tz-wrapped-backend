@@ -22,13 +22,13 @@ spec:
     spec:
       containers:
         - name: tz-wrapped-backend
-          image: _TO_BE_REPLACED_BY_IMAGE_TAG_
+          image: __TO_BE_REPLACED_BY_IMAGE_TAG__
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: tz-wrapped-backend-config-map
-            # - secretRef:
-            #     name: tz-wrapped-backend-secret
+            - secretRef:
+                name: tz-wrapped-backend-secret
           ports:
             - containerPort: 80
           readinessProbe:

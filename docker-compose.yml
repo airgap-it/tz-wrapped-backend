@@ -1,0 +1,20 @@
+version: '3.1'
+services:
+  tz-wrapped-backend:
+    image: tz-wrapped-backend:latest
+    restart: always
+    ports:
+      - 8080:80
+    depends_on:
+      - "postgres"
+    environment:
+      TZW_DATABASE__HOST: postgres
+  postgres:
+    image: postgres:11.9
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: "user"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_DB: "tz-wrapped"
+      POSTGRES_INITDB_ARGS: "--nosync --lc-collate=C"

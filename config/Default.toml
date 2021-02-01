@@ -1,0 +1,15 @@
+[server]
+address = "0.0.0.0:80"
+
+[database]
+host = "postgres"
+port = "5432"
+user = "user"
+password = "password"
+name = "tz-wrapped"
+
+[smtp]
+host = ""
+port = "587"
+user = ""
+password = ""
