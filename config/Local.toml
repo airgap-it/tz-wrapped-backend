@@ -25,6 +25,11 @@ public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
 name = "Sudden Push GK"
 email = "godenzim@me.com"
 
+[[contracts.gatekeepers]]
+public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
+name = "Picnic Give"
+email = "godenzim@me.com"
+
 [[contracts.keyholders]]
 name = "Ugly Release"
 email = "godenzim@me.com"
@@ -53,6 +58,11 @@ email = "godenzim@me.com"
 [[contracts.gatekeepers]]
 public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
 name = "Sudden Push"
+email = "godenzim@me.com"
+
+[[contracts.gatekeepers]]
+public_key = "edpkvKgKWxh5m2G1qBn4HS1VN3bF63D723Ba9eKacdSPCBzLWe1WCy"
+name = "Original Cluster"
 email = "godenzim@me.com"
 
 [[contracts.keyholders]]
