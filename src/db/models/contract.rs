@@ -50,7 +50,7 @@ impl Contract {
         limit: i64,
     ) -> Result<(Vec<Contract>, i64), diesel::result::Error> {
         let contracts_query = contracts::dsl::contracts
-            .order_by(contracts::dsl::created_at)
+            .order_by(contracts::dsl::display_name.asc())
             .paginate(page)
             .per_page(limit);
 

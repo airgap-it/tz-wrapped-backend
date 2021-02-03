@@ -8,8 +8,8 @@ node_url = "https://testnet-tezos.giganode.io"
 host = "localhost"
 
 [[contracts]]
-address = "KT1Q66HBBQYaHGAKnxeuedkgLyJYF9jkD96H"
-multisig = "KT1BYMvJoM75JyqFbsLKouqkAv8dgEvViioP"
+address = "KT1X6iAsssYNMK4YQC7ujvfAHiwqdwbac73Q"
+multisig = "KT1BAxSLXenicfoNAA6EXe8RojVpBJ3KiMCt"
 name = "tzBTC"
 kind = "fa1"
 token_id = 0
