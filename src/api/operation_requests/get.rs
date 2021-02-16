@@ -43,9 +43,10 @@ pub struct Info {
 pub async fn operation_requests(
     pool: web::Data<DbPool>,
     query: Query<Info>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
 
@@ -121,9 +122,10 @@ pub struct PathInfo {
 pub async fn operation_request(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let id = path.id;
@@ -155,9 +157,10 @@ pub async fn signable_message(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
     tezos_settings: web::Data<settings::Tezos>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let id = path.id;
     let (operation_request, contract) =
@@ -189,9 +192,10 @@ pub async fn operation_request_parameters(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
     tezos_settings: web::Data<settings::Tezos>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let id = path.id;

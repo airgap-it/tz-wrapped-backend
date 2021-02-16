@@ -67,8 +67,11 @@ pub async fn sign_in(
     Ok(HttpResponse::Ok().json(authentication_challenge))
 }
 
-pub async fn get_me(session: Session) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+pub async fn get_me(
+    session: Session,
+    server_settings: web::Data<settings::Server>,
+) -> Result<HttpResponse, APIError> {
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     Ok(HttpResponse::Ok().json(current_user))
 }

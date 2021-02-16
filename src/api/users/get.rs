@@ -10,7 +10,6 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::models::user::User as DBUser;
 use crate::DbPool;
 use crate::{
     api::models::{
@@ -20,6 +19,7 @@ use crate::{
     },
     auth::get_current_user,
 };
+use crate::{db::models::user::User as DBUser, settings};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -34,9 +34,10 @@ pub struct Info {
 pub async fn users(
     pool: web::Data<DbPool>,
     query: Query<Info>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     current_user.require_roles(
         vec![UserKind::Gatekeeper, UserKind::Keyholder],
@@ -95,9 +96,10 @@ pub struct PathInfo {
 pub async fn user(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let id = path.id;

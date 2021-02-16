@@ -8,7 +8,6 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::DbPool;
 use crate::{
     api::models::user::UserKind,
     db::models::{
@@ -20,6 +19,7 @@ use crate::{
     api::models::{common::ListResponse, error::APIError, operation_approval::OperationApproval},
     auth::get_current_user,
 };
+use crate::{settings, DbPool};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -31,9 +31,10 @@ pub struct Info {
 pub async fn operation_approvals(
     pool: web::Data<DbPool>,
     query: Query<Info>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let operation_request_id = query.operation_request_id;
@@ -83,9 +84,10 @@ pub struct PathInfo {
 pub async fn operation_approval(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let id = path.id;

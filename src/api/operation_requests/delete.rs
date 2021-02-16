@@ -28,8 +28,9 @@ pub async fn operation_request(
     path: Path<PathInfo>,
     session: Session,
     tezos_settings: web::Data<settings::Tezos>,
+    server_settings: web::Data<settings::Server>,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let operation_request_id = path.id;
     let conn = pool.get()?;

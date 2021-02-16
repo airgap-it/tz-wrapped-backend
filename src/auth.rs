@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
 use actix_session::Session;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -10,6 +11,7 @@ use crate::{
 };
 
 const CURRENT_USER_KEY: &str = "current_user";
+const LAST_ACTIVITY: &str = "last_activity";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionUser {
@@ -60,12 +62,22 @@ pub fn is_authenticated(session: &Session) -> bool {
     return false;
 }
 
-pub fn get_current_user(session: &Session) -> Result<SessionUser, APIError> {
+pub fn get_current_user(session: &Session, activity_timeout: i64) -> Result<SessionUser, APIError> {
     let user = session
         .get::<SessionUser>(CURRENT_USER_KEY)
         .map_err(|_error| APIError::Unauthorized)?;
 
     if let Some(user) = user {
+        let last_timestamp = get_last_activity_timestamp(session)?;
+        let now = Utc::now().timestamp();
+
+        if now - last_timestamp > activity_timeout {
+            session.clear();
+
+            return Err(APIError::Unauthorized);
+        }
+
+        let _ = update_last_activity_timestamp(session);
         return Ok(user);
     }
 
@@ -80,4 +92,23 @@ pub fn set_current_user(session: &Session, user: &SessionUser) -> Result<(), act
 
 pub fn remove_current_user(session: &Session) -> () {
     session.remove(CURRENT_USER_KEY)
+}
+
+fn update_last_activity_timestamp(session: &Session) -> Result<(), actix_web::Error> {
+    let now = Utc::now().timestamp();
+    session.set(LAST_ACTIVITY, now)?;
+
+    Ok(())
+}
+
+fn get_last_activity_timestamp(session: &Session) -> Result<i64, APIError> {
+    let last_activity_timestamp = session
+        .get::<i64>(LAST_ACTIVITY)
+        .map_err(|_error| APIError::Unauthorized)?;
+
+    if let Some(last_activity_timestamp) = last_activity_timestamp {
+        return Ok(last_activity_timestamp);
+    }
+
+    Ok(Utc::now().timestamp())
 }
