@@ -26,10 +26,11 @@ pub async fn operation_approval(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
     contract_settings: web::Data<Vec<settings::Contract>>,
+    server_settings: web::Data<settings::Server>,
     body: web::Json<NewOperationApproval>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let (operation_request, contract) =
         get_operation_request_and_contract(&pool, body.operation_request_id).await?;

@@ -34,9 +34,10 @@ pub async fn new_operation_request(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
     new_operation_request: web::Json<NewOperationRequest>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let contract_id = new_operation_request.contract_id;

@@ -9,6 +9,7 @@ use crate::api::models::contract::ContractKind;
 pub struct Server {
     pub address: String,
     pub domain_name: String,
+    pub inactivity_timeout_seconds: i64,
 }
 
 #[derive(Debug, Deserialize, Clone)]

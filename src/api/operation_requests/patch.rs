@@ -8,7 +8,6 @@ use actix_web::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::models::{operation_request::OperationRequest as DBOperationRequest, user::User};
 use crate::tezos::coding::validate_operation_hash;
 use crate::DbPool;
 use crate::{
@@ -18,6 +17,10 @@ use crate::{
         user::UserKind,
     },
     auth::get_current_user,
+};
+use crate::{
+    db::models::{operation_request::OperationRequest as DBOperationRequest, user::User},
+    settings,
 };
 
 #[derive(Deserialize)]
@@ -29,9 +32,10 @@ pub async fn operation_request(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
     patch_operation_request: web::Json<PatchOperationRequest>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let operation_request_id = path.id;

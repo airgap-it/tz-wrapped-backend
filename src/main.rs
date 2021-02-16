@@ -3,7 +3,7 @@ use std::convert::TryInto;
 
 use actix_cors::Cors;
 use actix_session::CookieSession;
-use actix_web::{cookie::SameSite, middleware, web, App, HttpServer, Responder};
+use actix_web::{cookie::SameSite, http::Uri, middleware, web, App, HttpServer, Responder};
 
 #[macro_use]
 extern crate diesel;
@@ -97,10 +97,24 @@ async fn main() -> std::io::Result<()> {
             .domain(CONFIG.server.domain_name.clone())
             .path("/")
             .http_only(true)
-            .same_site(same_site)
-            .expires_in(86400);
+            .same_site(same_site);
+
+        let domain_suffix: &str = domain_suffix();
+        let allowed_origins: Vec<(&str, &str)> = match CONFIG.env {
+            ENV::Development => vec![("http", "localhost"), ("https", domain_suffix)], // this allows to run the frontend on localhost and connect to the DEV instance
+            ENV::Testing => vec![],
+            ENV::Production => vec![("https", domain_suffix)],
+            ENV::Local => vec![("http", domain_suffix), ("https", domain_suffix)],
+        };
         let cors = Cors::default()
-            .allow_any_origin()
+            .allowed_origin_fn(move |origin, _req_header| {
+                let url = origin.to_str().unwrap().parse::<Uri>().unwrap();
+
+                allowed_origins.iter().any(|allowed_origin| {
+                    url.scheme_str().unwrap() == allowed_origin.0
+                        && url.host().unwrap().ends_with(allowed_origin.1)
+                })
+            })
             .allow_any_method()
             .allow_any_header()
             .supports_credentials();
@@ -114,18 +128,29 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/api/v1")
                     .data(CONFIG.tezos.clone())
-                    .configure(api::operation_requests::api_config)
-                    .configure(api::users::api_config)
+                    .data(CONFIG.server.clone())
                     .configure(api::contracts::api_config)
+                    .configure(api::users::api_config)
+                    .configure(api::operation_requests::api_config)
                     .data(CONFIG.contracts.clone())
                     .configure(api::operation_approvals::api_config)
-                    .data(CONFIG.server.clone())
                     .configure(api::authentication::api_config),
             )
     })
     .bind(&CONFIG.server.address)?
     .run()
     .await
+}
+
+fn domain_suffix() -> &'static str {
+    let server_domain_name = &CONFIG.server.domain_name;
+    let index = server_domain_name.find(".");
+
+    if let Some(index) = index {
+        &server_domain_name[index..]
+    } else {
+        &server_domain_name[..]
+    }
 }
 
 async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
