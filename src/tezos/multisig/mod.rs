@@ -1,21 +1,25 @@
 use async_trait::async_trait;
 use num_traits::ToPrimitive;
-use std::convert::TryFrom;
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+};
 
 use crate::{
-    api::models::contract::ContractKind,
+    api::models::{contract::ContractKind, operation_request::OperationRequestKind},
+    db::models::{contract::Contract, operation_request::OperationRequest, user::User},
     tezos::micheline::{extract_prim, primitive::Primitive},
 };
 use crate::{
     crypto,
     tezos::{
-        micheline::{
-            extract_int, extract_sequence, extract_string, primitive::Data, MichelsonV1Expression,
-        },
+        micheline::{extract_int, extract_sequence, primitive::Data, MichelsonV1Expression},
         TzError,
     },
 };
 use serde::Serialize;
+
+use super::{coding::decode_public_key, micheline::extract_bytes};
 
 mod generic_multisig;
 mod specific_multisig;
@@ -42,21 +46,63 @@ pub trait Multisig: Send + Sync {
     async fn min_signatures(&mut self) -> Result<i64, TzError>;
     async fn approvers(&mut self) -> Result<&Vec<String>, TzError>;
 
-    async fn signable_message_for_call(
+    async fn signable_message(
         &self,
-        chain_id: String,
-        nonce: i64,
-        contract_address: String,
-        call: MichelsonV1Expression,
+        contract: &Contract,
+        operation_request: &OperationRequest,
+        proposed_keyholders: Option<Vec<User>>,
     ) -> Result<SignableMessage, TzError>;
 
-    async fn parameters_for_call(
+    async fn transaction_parameters(
         &mut self,
-        call: MichelsonV1Expression,
-        nonce: i64,
+        contract: &Contract,
+        operation_request: &OperationRequest,
+        proposed_keyholders: Option<Vec<User>>,
         signatures: Vec<Signature<'_>>,
-        contract_address: &str,
     ) -> Result<Parameters, TzError>;
+}
+
+fn validate(
+    operation_request: &OperationRequest,
+    proposed_keyholders: &Option<Vec<User>>,
+) -> Result<(), TzError> {
+    let operation_request_kind: OperationRequestKind = operation_request.kind.try_into()?;
+    if operation_request.amount.is_none()
+        && (operation_request_kind == OperationRequestKind::Mint
+            || operation_request_kind == OperationRequestKind::Burn)
+    {
+        return Err(TzError::InvalidValue {
+            description: "amount is required for mint and burn operation requests".to_owned(),
+        });
+    }
+
+    if operation_request.target_address.is_none()
+        && operation_request_kind == OperationRequestKind::Mint
+    {
+        return Err(TzError::InvalidValue {
+            description: "target_address is required for mint operation requests".to_owned(),
+        });
+    }
+
+    if operation_request.threshold.is_none()
+        && operation_request_kind == OperationRequestKind::UpdateKeyholders
+    {
+        return Err(TzError::InvalidValue {
+            description: "threshold is required for update keyholders operation requests"
+                .to_owned(),
+        });
+    }
+
+    if proposed_keyholders.is_none()
+        && operation_request_kind == OperationRequestKind::UpdateKeyholders
+    {
+        return Err(TzError::InvalidValue {
+            description: "no keyholders provided for update keyholders operation request"
+                .to_owned(),
+        });
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Serialize)]
@@ -121,19 +167,16 @@ impl TryFrom<&MichelsonV1Expression> for Storage {
         let first = arguments.first().unwrap();
         let second = arguments.last().unwrap();
         let min_signatures = extract_int(first).or_else(|_error| extract_int(second))?;
-        let public_keys: Vec<&String> = extract_sequence(first)
+        let public_keys = extract_sequence(first)
             .or_else(|_error| extract_sequence(second))?
             .iter()
-            .map(|pk| extract_string(pk))
-            .collect::<Result<Vec<&String>, TzError>>()?;
+            .map(|pk| decode_public_key(extract_bytes(pk)?))
+            .collect::<Result<Vec<String>, TzError>>()?;
 
         Ok(Storage {
             nonce: nonce.to_i64().unwrap(),
             min_signatures: min_signatures.to_i64().unwrap(),
-            approvers_public_keys: public_keys
-                .iter()
-                .map(|pk| pk.to_owned().to_owned())
-                .collect(),
+            approvers_public_keys: public_keys.iter().map(|pk| pk.to_owned()).collect(),
         })
     }
 }
@@ -141,11 +184,17 @@ impl TryFrom<&MichelsonV1Expression> for Storage {
 impl Storage {
     async fn fetch_from(address: &String, node_url: &String) -> Result<Storage, TzError> {
         let path = format!(
-            "/chains/main/blocks/head/context/contracts/{}/storage",
+            "/chains/main/blocks/head/context/contracts/{}/storage/normalized",
             address
         );
         let url = format!("{}{}", node_url, path);
-        let response = reqwest::get(&url)
+        let client = reqwest::Client::new();
+        let mut json = HashMap::new();
+        json.insert("unparsing_mode", "Optimized_legacy");
+        let response = client
+            .post(&url)
+            .json(&json)
+            .send()
             .await
             .map_err(|_error| TzError::NetworkFailure)?
             .json::<MichelsonV1Expression>()

@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
+use diesel::{dsl::any, prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
 use uuid::Uuid;
 
 use crate::api::models::{
@@ -44,6 +44,35 @@ impl User {
         Ok(result)
     }
 
+    pub fn get_first(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        address: &str,
+        state: Option<UserState>,
+        kind: Option<UserKind>,
+        contract_id: Option<Uuid>,
+    ) -> Result<User, diesel::result::Error> {
+        let mut query = users::dsl::users
+            .filter(users::dsl::address.eq(address))
+            .order_by(users::dsl::created_at)
+            .into_boxed();
+
+        if let Some(kind) = kind {
+            query = query.filter(users::dsl::kind.eq::<i16>(kind.into()));
+        }
+
+        if let Some(state) = state {
+            query = query.filter(users::dsl::state.eq::<i16>(state.into()));
+        }
+
+        if let Some(contract_id) = contract_id {
+            query = query.filter(users::dsl::contract_id.eq(contract_id));
+        }
+
+        let result = query.first(conn)?;
+
+        Ok(result)
+    }
+
     pub fn get_all_with_ids(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         ids: Vec<&Uuid>,
@@ -59,14 +88,7 @@ impl User {
         kind: UserKind,
         contract_id: Uuid,
     ) -> Result<User, diesel::result::Error> {
-        let result: User = users::dsl::users
-            .filter(users::dsl::address.eq(address))
-            .filter(users::dsl::contract_id.eq(contract_id))
-            .filter(users::dsl::kind.eq::<i16>(kind.into()))
-            .filter(users::dsl::state.eq::<i16>(UserState::Active.into()))
-            .first(conn)?;
-
-        Ok(result)
+        User::get_first(conn, address, None, Some(kind), Some(contract_id))
     }
 
     pub fn get_all(
@@ -75,6 +97,7 @@ impl User {
         contract_id: Option<Uuid>,
         state: Option<UserState>,
         address: Option<&String>,
+        public_key: Option<&String>,
     ) -> Result<Vec<User>, diesel::result::Error> {
         let mut query = users::dsl::users
             .order_by(users::dsl::created_at)
@@ -96,6 +119,10 @@ impl User {
             query = query.filter(users::dsl::address.eq(address));
         }
 
+        if let Some(public_key) = public_key {
+            query = query.filter(users::dsl::public_key.eq(public_key));
+        }
+
         let result = query.load(conn)?;
 
         Ok(result)
@@ -112,7 +139,23 @@ impl User {
             Some(contract_id),
             Some(UserState::Active),
             None,
+            None,
         )
+    }
+
+    pub fn get_all_matching_any(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        contract_id: Uuid,
+        kind: UserKind,
+        public_keys: &Vec<String>,
+    ) -> Result<Vec<User>, diesel::result::Error> {
+        let query = users::dsl::users
+            .filter(users::dsl::contract_id.eq(contract_id))
+            .filter(users::dsl::kind.eq::<i16>(kind.into()))
+            .filter(users::dsl::public_key.eq(any(public_keys)))
+            .order_by(users::dsl::created_at);
+
+        query.load(conn)
     }
 
     pub fn get_list(
@@ -146,6 +189,28 @@ impl User {
         paginated_query.load_and_count_pages::<User>(&conn)
     }
 
+    pub fn insert(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        new_users: Vec<NewUser>,
+    ) -> Result<Vec<User>, diesel::result::Error> {
+        diesel::insert_into(users::dsl::users)
+            .values(new_users)
+            .get_results(conn)
+    }
+
+    pub fn update(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        updated_users: Vec<UpdateUser>,
+    ) -> Result<usize, diesel::result::Error> {
+        let mut changes: usize = 0;
+        for update in updated_users {
+            changes += diesel::update(users::dsl::users.find(update.id))
+                .set(update)
+                .execute(conn)?;
+        }
+        Ok(changes)
+    }
+
     // TODO: refactor and optimize this method
     pub fn sync_users(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
@@ -153,7 +218,7 @@ impl User {
         kind: UserKind,
         users: &Vec<SyncUser>,
     ) -> Result<usize, APIError> {
-        let stored_users = User::get_all(conn, Some(kind), Some(contract_id), None, None)?;
+        let stored_users = User::get_all(conn, Some(kind), Some(contract_id), None, None, None)?;
 
         let to_deactivate: Vec<_> = stored_users
             .iter()
@@ -191,6 +256,7 @@ impl User {
                     kind: kind.into(),
                     display_name: user.display_name.clone(),
                     email: user.email.clone(),
+                    state: UserState::Active.into(),
                 })
             })
             .collect::<Result<Vec<NewUser>, APIError>>()?;
@@ -198,25 +264,18 @@ impl User {
         let to_update: Vec<_> = users
             .iter()
             .filter_map(|user| {
-                let found = stored_users
-                    .iter()
-                    .find(|stored_user| stored_user.public_key == user.public_key);
+                let inactive: i16 = UserState::Inactive.into();
+                let found = stored_users.iter().find(|stored_user| {
+                    stored_user.public_key == user.public_key && stored_user.state == inactive
+                });
 
                 if let Some(stored_user) = found {
-                    let inactive: i16 = UserState::Inactive.into();
-                    let has_changes = stored_user.display_name != user.display_name
-                        || stored_user.email != user.email
-                        || stored_user.state == inactive;
-                    if has_changes {
-                        Some(UpdateUser {
-                            id: stored_user.id,
-                            state: UserState::Active.into(),
-                            display_name: user.display_name.clone(),
-                            email: user.email.clone(),
-                        })
-                    } else {
-                        None
-                    }
+                    Some(UpdateUser {
+                        id: stored_user.id,
+                        state: UserState::Active.into(),
+                        display_name: stored_user.display_name.clone(),
+                        email: stored_user.email.clone(),
+                    })
                 } else {
                     None
                 }
@@ -227,7 +286,7 @@ impl User {
 
         if !to_deactivate.is_empty() {
             let deactivated =
-                diesel::update(users::dsl::users.filter(users::dsl::id.eq_any(to_deactivate)))
+                diesel::update(users::dsl::users.filter(users::dsl::id.eq(any(to_deactivate))))
                     .set(users::dsl::state.eq::<i16>(UserState::Inactive.into()))
                     .execute(conn)?;
 
@@ -263,6 +322,7 @@ pub struct NewUser {
     pub kind: i16,
     pub display_name: String,
     pub email: Option<String>,
+    pub state: i16,
 }
 
 #[derive(AsChangeset, Debug)]

@@ -2,6 +2,7 @@ use actix_web::{web, HttpResponse};
 
 mod delete;
 mod get;
+mod patch;
 mod post;
 
 pub fn api_config(cfg: &mut web::ServiceConfig) {
@@ -14,7 +15,8 @@ pub fn api_config(cfg: &mut web::ServiceConfig) {
     );
     cfg.service(
         web::resource("/auth/me")
-            .route(web::get().to(get::get_me))
+            .route(web::get().to(get::me))
+            .route(web::patch().to(patch::me))
             .route(web::head().to(|| HttpResponse::MethodNotAllowed())),
     );
 }

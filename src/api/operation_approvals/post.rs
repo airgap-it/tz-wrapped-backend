@@ -5,22 +5,23 @@ use actix_web::{web, HttpResponse};
 use multisig::SignableMessage;
 use uuid::Uuid;
 
-use crate::api::models::{
-    error::APIError,
-    operation_approval::{NewOperationApproval, OperationApproval},
-};
 use crate::db::models::{
-    contract::Contract,
-    operation_approval::NewOperationApproval as DBNewOperationApproval,
+    contract::Contract, operation_approval::NewOperationApproval as DBNewOperationApproval,
     operation_approval::OperationApproval as DBOperationApproval,
-    operation_request::OperationRequest,
-    user::{SyncUser, User},
+    operation_request::OperationRequest, user::User,
 };
 use crate::notifications::notify_min_approvals_received;
 use crate::settings;
-use crate::tezos::contract::{get_signable_message, multisig, multisig::Multisig};
+use crate::tezos::multisig;
 use crate::DbPool;
 use crate::{api::models::user::UserKind, auth::get_current_user};
+use crate::{
+    api::models::{
+        error::APIError,
+        operation_approval::{NewOperationApproval, OperationApproval},
+    },
+    auth::SessionUser,
+};
 
 pub async fn operation_approval(
     pool: web::Data<DbPool>,
@@ -32,7 +33,7 @@ pub async fn operation_approval(
 ) -> Result<HttpResponse, APIError> {
     let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
-    let (operation_request, contract) =
+    let (operation_request, contract, proposed_keyholders) =
         get_operation_request_and_contract(&pool, body.operation_request_id).await?;
 
     current_user.require_roles(vec![UserKind::Keyholder], contract.id)?;
@@ -43,28 +44,23 @@ pub async fn operation_approval(
         tezos_settings.node_url.as_ref(),
     );
 
-    let signable_message = get_signable_message(
-        &contract,
-        operation_request.kind.try_into()?,
-        operation_request.target_address.as_ref(),
-        operation_request.amount.as_bigint_and_exponent().0,
-        operation_request.nonce.into(),
-        operation_request.chain_id.as_ref(),
-        &multisig,
-    )
-    .await?;
+    let signable_message = multisig
+        .signable_message(&contract, &operation_request, proposed_keyholders)
+        .await?;
 
     let min_approvals = multisig.min_signatures().await?;
 
-    let keyholder = find_and_validate_keyholder(
+    crate::db::sync_keyholders(
         &pool,
-        &signable_message,
-        &contract,
-        multisig,
-        &body,
-        contract_settings,
+        vec![contract.clone()],
+        &tezos_settings.node_url,
+        &contract_settings,
     )
     .await?;
+
+    let keyholder =
+        find_and_validate_keyholder(&pool, current_user, &signable_message, &contract, &body)
+            .await?;
 
     let inserted_approval = store_approval(&pool, keyholder.id, body.into_inner()).await?;
 
@@ -120,80 +116,45 @@ async fn store_approval(
 
 async fn find_and_validate_keyholder(
     pool: &web::Data<DbPool>,
+    current_user: SessionUser,
     message: &SignableMessage,
     contract: &Contract,
-    mut multisig: Box<dyn Multisig + '_>,
     operation_approval: &NewOperationApproval,
-    contract_settings: web::Data<Vec<settings::Contract>>,
 ) -> Result<User, APIError> {
-    let keyholder_public_keys = multisig.approvers().await?.to_owned();
-
-    let contract_setting = contract_settings
-        .iter()
-        .find(|contract_setting| {
-            contract_setting.address == contract.pkh
-                && contract_setting.multisig == contract.multisig_pkh
-                && contract_setting.token_id == (contract.token_id as i64)
-        })
-        .expect("corresponding contract settings must be found");
-
-    let keyholders: Vec<_> = keyholder_public_keys
-        .into_iter()
-        .enumerate()
-        .map(|(position, public_key)| {
-            let keyholder_settings = if position < contract_setting.keyholders.len() {
-                Some(&contract_setting.keyholders[position])
-            } else {
-                None
-            };
-
-            SyncUser {
-                public_key,
-                display_name: keyholder_settings
-                    .map(|kh| kh.name.clone())
-                    .unwrap_or("Unknown".into()),
-                email: keyholder_settings.map(|kh| kh.email.clone()),
-            }
-        })
-        .collect();
-
     let conn = pool.get()?;
     let contract_id = contract.id.clone();
-    let keyholders = web::block::<_, _, APIError>(move || {
-        let _changes =
-            User::sync_users(&conn, contract_id, UserKind::Keyholder, keyholders.as_ref())?;
-
-        Ok(User::get_all_active(
+    let keyholder = web::block::<_, _, APIError>(move || {
+        Ok(User::get_active(
             &conn,
-            contract_id,
+            &current_user.address,
             UserKind::Keyholder,
+            contract_id,
         )?)
     })
     .await?;
 
     let hashed = message.blake2b_hash()?;
-
-    let mut result: Result<User, APIError> = Err(APIError::InvalidSignature);
-    for kh in keyholders {
-        let is_match = kh.verify_message(&hashed, &operation_approval.signature)?;
-        if is_match {
-            result = Ok(kh);
-            break;
-        }
+    let is_match = keyholder.verify_message(&hashed, &operation_approval.signature)?;
+    if is_match {
+        return Ok(keyholder);
     }
-
-    result
+    Err(APIError::InvalidSignature)
 }
 
 async fn get_operation_request_and_contract(
     pool: &web::Data<DbPool>,
     operation_request_id: Uuid,
-) -> Result<(OperationRequest, Contract), APIError> {
+) -> Result<(OperationRequest, Contract, Option<Vec<User>>), APIError> {
     let conn = pool.get()?;
 
-    let result: (OperationRequest, Contract) =
-        web::block(move || OperationRequest::get_with_contract(&conn, &operation_request_id))
-            .await?;
+    let result: (OperationRequest, Contract, Option<Vec<User>>) =
+        web::block::<_, _, APIError>(move || {
+            let (operation_request, contract) =
+                OperationRequest::get_with_contract(&conn, &operation_request_id)?;
+            let proposed_keyholders = operation_request.proposed_keyholders(&conn)?;
+            Ok((operation_request, contract, proposed_keyholders))
+        })
+        .await?;
 
     Ok(result)
 }

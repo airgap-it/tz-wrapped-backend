@@ -44,12 +44,23 @@ table! {
         gatekeeper_id -> Uuid,
         contract_id -> Uuid,
         target_address -> Nullable<Varchar>,
-        amount -> Numeric,
+        amount -> Nullable<Numeric>,
+        threshold -> Nullable<Int8>,
         kind -> Int2,
         chain_id -> Varchar,
         nonce -> Int8,
         state -> Int2,
         operation_hash -> Nullable<Varchar>,
+    }
+}
+
+table! {
+    proposed_users (id) {
+        id -> Uuid,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+        user_id -> Uuid,
+        operation_request_id -> Uuid,
     }
 }
 
@@ -72,6 +83,8 @@ joinable!(operation_approvals -> operation_requests (operation_request_id));
 joinable!(operation_approvals -> users (keyholder_id));
 joinable!(operation_requests -> contracts (contract_id));
 joinable!(operation_requests -> users (gatekeeper_id));
+joinable!(proposed_users -> operation_requests (operation_request_id));
+joinable!(proposed_users -> users (user_id));
 joinable!(users -> contracts (contract_id));
 
 allow_tables_to_appear_in_same_query!(
@@ -79,5 +92,6 @@ allow_tables_to_appear_in_same_query!(
     contracts,
     operation_approvals,
     operation_requests,
+    proposed_users,
     users,
 );

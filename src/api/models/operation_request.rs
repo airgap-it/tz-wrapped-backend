@@ -24,7 +24,9 @@ pub struct OperationRequest {
     pub gatekeeper: User,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: String,
+    pub amount: Option<String>,
+    pub threshold: Option<i64>,
+    pub proposed_keyholders: Option<Vec<User>>,
     pub kind: OperationRequestKind,
     pub chain_id: String,
     pub nonce: i64,
@@ -38,6 +40,7 @@ impl OperationRequest {
         operation_request: DBOperationRequest,
         gatekeeper: DBUser,
         operation_approvals: Vec<(DBOperationApproval, DBUser)>,
+        proposed_keyholders: Option<Vec<DBUser>>,
     ) -> Result<OperationRequest, APIError> {
         Ok(OperationRequest {
             id: operation_request.id,
@@ -46,7 +49,20 @@ impl OperationRequest {
             gatekeeper: gatekeeper.try_into()?,
             contract_id: operation_request.contract_id,
             target_address: operation_request.target_address,
-            amount: operation_request.amount.to_string(),
+            amount: operation_request.amount.map(|amount| amount.to_string()),
+            threshold: operation_request.threshold,
+            proposed_keyholders: proposed_keyholders
+                .and_then(|keyholders| {
+                    keyholders
+                        .into_iter()
+                        .map(|keyholder| {
+                            let keyholder: Result<User, APIError> = keyholder.try_into();
+
+                            Some(keyholder)
+                        })
+                        .collect::<Option<Result<Vec<User>, APIError>>>()
+                })
+                .map_or(Ok(None), |r| r.map(Some))?,
             kind: operation_request.kind.try_into()?,
             chain_id: operation_request.chain_id,
             nonce: operation_request.nonce,
@@ -66,7 +82,9 @@ impl OperationRequest {
 pub struct NewOperationRequest {
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: String,
+    pub amount: Option<String>,
+    pub threshold: Option<i64>,
+    pub proposed_keyholders: Option<Vec<String>>,
     pub kind: OperationRequestKind,
 }
 
@@ -76,14 +94,16 @@ pub struct PatchOperationRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum OperationRequestKind {
     Mint = 0,
     Burn = 1,
+    UpdateKeyholders = 2,
 }
 
 const MINT: &'static str = "mint";
 const BURN: &'static str = "burn";
+const UPDATE_KEYHOLDERS: &'static str = "update_keyholders";
 
 impl TryFrom<&str> for OperationRequestKind {
     type Error = APIError;
@@ -92,6 +112,7 @@ impl TryFrom<&str> for OperationRequestKind {
         match value {
             MINT => Ok(OperationRequestKind::Mint),
             BURN => Ok(OperationRequestKind::Burn),
+            UPDATE_KEYHOLDERS => Ok(OperationRequestKind::UpdateKeyholders),
             _ => Err(APIError::Internal {
                 description: format!("invalid operation kind: {}", value),
             }),
@@ -106,6 +127,7 @@ impl TryFrom<i16> for OperationRequestKind {
         match value {
             0 => Ok(OperationRequestKind::Mint),
             1 => Ok(OperationRequestKind::Burn),
+            2 => Ok(OperationRequestKind::UpdateKeyholders),
             _ => Err(APIError::InvalidValue {
                 description: format!("operation kind cannot be {}", value),
             }),
@@ -118,6 +140,7 @@ impl Into<&'static str> for OperationRequestKind {
         match self {
             OperationRequestKind::Mint => MINT,
             OperationRequestKind::Burn => BURN,
+            OperationRequestKind::UpdateKeyholders => UPDATE_KEYHOLDERS,
         }
     }
 }
@@ -127,6 +150,7 @@ impl Into<i16> for OperationRequestKind {
         match self {
             OperationRequestKind::Mint => 0,
             OperationRequestKind::Burn => 1,
+            OperationRequestKind::UpdateKeyholders => 2,
         }
     }
 }
@@ -136,6 +160,7 @@ impl Display for OperationRequestKind {
         let value: &str = match self {
             OperationRequestKind::Mint => MINT,
             OperationRequestKind::Burn => BURN,
+            OperationRequestKind::UpdateKeyholders => UPDATE_KEYHOLDERS,
         };
         write!(f, "{}", value)
     }

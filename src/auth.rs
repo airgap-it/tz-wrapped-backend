@@ -20,17 +20,16 @@ pub struct SessionUser {
 }
 
 impl SessionUser {
-    pub fn new(address: String, associated_db_users: Vec<User>) -> Self {
-        SessionUser {
-            address,
-            roles: associated_db_users
-                .iter()
-                .map(|user| SessionUserRole {
-                    contract_id: user.contract_id,
-                    kind: user.kind.try_into().unwrap(),
-                })
-                .collect(),
-        }
+    pub fn new(address: String, associated_db_users: &Vec<User>) -> Self {
+        let roles = associated_db_users
+            .iter()
+            .map(|user| SessionUserRole {
+                contract_id: user.contract_id,
+                kind: user.kind.try_into().unwrap(),
+            })
+            .collect::<Vec<SessionUserRole>>();
+
+        SessionUser { address, roles }
     }
 
     pub fn require_roles(&self, kinds: Vec<UserKind>, contract_id: Uuid) -> Result<(), APIError> {

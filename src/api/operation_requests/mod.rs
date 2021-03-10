@@ -9,7 +9,7 @@ pub fn api_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/operation-requests")
             .route(web::get().to(get::operation_requests))
-            .route(web::post().to(post::new_operation_request))
+            .route(web::post().to(post::operation_request))
             .route(web::head().to(|| HttpResponse::MethodNotAllowed())),
     );
     cfg.service(

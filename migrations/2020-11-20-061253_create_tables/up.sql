@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS operation_requests (
     gatekeeper_id       uuid NOT NULL,
     contract_id         uuid NOT NULL,
     target_address      VARCHAR DEFAULT NULL,
-    amount              NUMERIC(1000, 0) NOT NULL,
+    amount              NUMERIC(1000, 0) DEFAULT NULL,
+    threshold           BIGINT DEFAULT NULL,
     kind                SMALLINT NOT NULL,
     chain_id            VARCHAR NOT NULL,
     nonce               BIGINT NOT NULL,
@@ -61,6 +62,18 @@ CREATE TABLE IF NOT EXISTS operation_approvals (
 
     UNIQUE(keyholder_id, operation_request_id),
     FOREIGN KEY(keyholder_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(operation_request_id) REFERENCES operation_requests(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS proposed_users (
+    id                      uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    user_id                 uuid NOT NULL,
+    operation_request_id    uuid NOT NULL,
+
+    UNIQUE(user_id, operation_request_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(operation_request_id) REFERENCES operation_requests(id) ON DELETE CASCADE
 );
 
