@@ -62,6 +62,10 @@ pub fn validate_edsig(value: &str) -> Result<(), TzError> {
     validate_value(value, EDSIG)
 }
 
+pub fn validate_edpk(value: &str) -> Result<(), TzError> {
+    validate_value(value, EDPK)
+}
+
 pub fn encode_chain_id(value: &str) -> Result<Vec<u8>, TzError> {
     encode(value, NET, None)
 }
@@ -152,6 +156,19 @@ pub fn encode_public_key(value: &str) -> Result<Vec<u8>, TzError> {
         EncodingPrefix::EDPK => encode(value, EDPK, Some(&[0])),
         EncodingPrefix::SPPK => encode(value, SPPK, Some(&[1])),
         EncodingPrefix::P2PK => encode(value, P2PK, Some(&[2])),
+        _ => Err(TzError::InvalidType),
+    }
+}
+
+pub fn decode_public_key(value: &Vec<u8>) -> Result<String, TzError> {
+    if value.len() <= 1 {
+        return Err(TzError::InvalidArgument);
+    }
+    let prefix = value.first().unwrap();
+    match prefix {
+        0 => decode(value, EDPK, Some(vec![*prefix].as_ref())),
+        1 => decode(value, SPPK, Some(vec![*prefix].as_ref())),
+        2 => decode(value, P2PK, Some(vec![*prefix].as_ref())),
         _ => Err(TzError::InvalidType),
     }
 }

@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bigdecimal::BigDecimal;
 use lettre::smtp::ConnectionReuseParameters;
 use lettre::ClientSecurity;
@@ -10,12 +8,10 @@ use lettre::{
 use lettre::{SmtpClient, Transport};
 use lettre_email::Email;
 use native_tls::{Protocol, TlsConnector};
-use num_bigint::BigInt;
 
 use crate::{
-    api::models::operation_request::{NewOperationRequest, OperationRequestKind},
-    db::models::operation_request::OperationRequest,
-    CONFIG,
+    api::models::operation_request::OperationRequestKind,
+    db::models::operation_request::OperationRequest, CONFIG,
 };
 use crate::{
     api::models::{common::SignableMessageInfo, error::APIError},
@@ -25,7 +21,7 @@ use crate::{
 pub fn notify_new_operation_request(
     gatekeeper: &User,
     keyholders: &Vec<User>,
-    operation_request: &NewOperationRequest,
+    operation_request: &OperationRequest,
     signable_message: &SignableMessageInfo,
     contract: &Contract,
 ) -> Result<(), APIError> {
@@ -34,8 +30,15 @@ pub fn notify_new_operation_request(
         .flat_map(|user| user.email.clone())
         .collect();
 
-    let amount = BigInt::from_str(&operation_request.amount)?;
-    let human_readable_amount = BigDecimal::new(amount, contract.decimals.into()).to_string();
+    let amount = operation_request
+        .amount
+        .as_ref()
+        .map(|amount| amount.as_bigint_and_exponent().0);
+    // .map_or(Ok(None), |r| r.map(Some))?;
+
+    let human_readable_amount = amount
+        .map(|amount| BigDecimal::new(amount, contract.decimals.into()).to_string())
+        .unwrap_or("0".to_owned());
     let target_address_line: String;
     if let Some(target_address) = operation_request.target_address.as_ref() {
         target_address_line = format!("<b>To:</b> {}", target_address)
@@ -95,11 +98,14 @@ pub fn notify_min_approvals_received(
     contract: &Contract,
 ) -> Result<(), APIError> {
     if let Some(to_email) = user.email.as_ref() {
-        let human_readable_amount = BigDecimal::new(
-            operation_request.amount.as_bigint_and_exponent().0,
-            contract.decimals.into(),
-        )
-        .to_string();
+        let human_readable_amount = operation_request
+            .amount
+            .as_ref()
+            .map(|amount| {
+                BigDecimal::new(amount.as_bigint_and_exponent().0, contract.decimals.into())
+                    .to_string()
+            })
+            .unwrap_or("0".to_owned());
         let target_address_line: String;
         if let Some(target_address) = operation_request.target_address.as_ref() {
             target_address_line = format!("<b>To:</b> {}", target_address)

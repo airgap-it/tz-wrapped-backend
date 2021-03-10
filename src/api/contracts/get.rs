@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::db::models::contract::Contract as DBContract;
 use crate::settings;
-use crate::tezos::contract::multisig;
+use crate::tezos::multisig;
 use crate::DbPool;
 use crate::{
     api::models::{common::ListResponse, contract::Contract, error::APIError},

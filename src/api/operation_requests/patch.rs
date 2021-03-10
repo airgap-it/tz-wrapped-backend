@@ -49,9 +49,9 @@ pub async fn operation_request(
         })?;
     }
 
-    let (updated_operation, gatekeeper, operation_approvals) =
+    let (updated_operation, gatekeeper, operation_approvals, proposed_keyholders) =
         web::block::<_, _, APIError>(move || {
-            let (operation_request, operation_approvals) =
+            let (operation_request, operation_approvals, proposed_keyholders) =
                 DBOperationRequest::get_with_operation_approvals(&conn, &operation_request_id)?;
 
             current_user.require_roles(
@@ -78,7 +78,12 @@ pub async fn operation_request(
             let updated_operation = DBOperationRequest::get(&conn, &operation_request_id)?;
             let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
 
-            Ok((updated_operation, gatekeeper, operation_approvals))
+            Ok((
+                updated_operation,
+                gatekeeper,
+                operation_approvals,
+                proposed_keyholders,
+            ))
         })
         .await?;
 
@@ -86,5 +91,6 @@ pub async fn operation_request(
         updated_operation,
         gatekeeper,
         operation_approvals,
+        proposed_keyholders,
     )?))
 }

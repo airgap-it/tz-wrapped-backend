@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-use std::convert::TryInto;
 
 use actix_cors::Cors;
 use actix_session::CookieSession;
@@ -193,56 +192,13 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
         }
     }
 
-    for contract in stored_contracts {
-        let mut multisig = tezos::contract::multisig::get_multisig(
-            contract.multisig_pkh.as_ref(),
-            contract.kind.try_into()?,
-            CONFIG.tezos.node_url.as_ref(),
-        );
-
-        let contract_settings = contracts
-            .iter()
-            .find(|contract_settings| {
-                contract_settings.address == contract.pkh
-                    && contract_settings.multisig == contract.multisig_pkh
-                    && contract_settings.token_id == (contract.token_id as i64)
-            })
-            .expect("corresponding contract settings must be found");
-
-        let keyholders: Vec<_> = multisig
-            .approvers()
-            .await?
-            .into_iter()
-            .enumerate()
-            .map(|(position, public_key)| {
-                let keyholder_settings = if position < contract_settings.keyholders.len() {
-                    Some(&contract_settings.keyholders[position])
-                } else {
-                    None
-                };
-
-                SyncUser {
-                    public_key: public_key.clone(),
-                    display_name: keyholder_settings
-                        .map(|kh| kh.name.clone())
-                        .unwrap_or("Unknown".into()),
-                    email: keyholder_settings.map(|kh| kh.email.clone()),
-                }
-            })
-            .collect();
-        conn = pool.get()?;
-        web::block::<_, _, APIError>(move || {
-            let _changes = user::User::sync_users(
-                &conn,
-                contract.id,
-                UserKind::Keyholder,
-                keyholders.as_ref(),
-            )?;
-
-            Ok(())
-        })
-        .await?;
-    }
+    db::sync_keyholders(
+        pool,
+        stored_contracts,
+        &CONFIG.tezos.node_url,
+        &CONFIG.contracts,
+    )
+    .await?;
 
     println!("syncing DB done");
     Ok(())

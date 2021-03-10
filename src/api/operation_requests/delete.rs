@@ -14,7 +14,7 @@ use crate::{
     auth::get_current_user,
     db::models::operation_request::OperationRequest,
     settings,
-    tezos::contract::multisig,
+    tezos::multisig,
     DbPool,
 };
 

@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use bigdecimal::BigDecimal;
 use chrono::NaiveDateTime;
 use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
@@ -6,13 +8,14 @@ use uuid::Uuid;
 use crate::{
     api::models::operation_request::OperationRequestKind,
     db::schema::{contracts, operation_requests, users},
+    tezos::TzError,
 };
 use crate::{
     api::models::operation_request::OperationRequestState,
     db::models::{contract::Contract, operation_approval::OperationApproval, user::User},
 };
 
-use super::pagination::Paginate;
+use super::{pagination::Paginate, proposed_user::ProposedUser};
 
 #[derive(Queryable, Identifiable, Associations, Debug)]
 #[belongs_to(User, foreign_key = "gatekeeper_id")]
@@ -24,7 +27,8 @@ pub struct OperationRequest {
     pub gatekeeper_id: Uuid,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: BigDecimal,
+    pub amount: Option<BigDecimal>,
+    pub threshold: Option<i64>,
     pub kind: i16,
     pub chain_id: String,
     pub nonce: i64,
@@ -43,10 +47,18 @@ impl OperationRequest {
     pub fn get_with_operation_approvals(
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: &Uuid,
-    ) -> Result<(OperationRequest, Vec<(OperationApproval, User)>), diesel::result::Error> {
+    ) -> Result<
+        (
+            OperationRequest,
+            Vec<(OperationApproval, User)>,
+            Option<Vec<User>>,
+        ),
+        diesel::result::Error,
+    > {
         let operation_request: OperationRequest = operation_requests::table.find(id).first(conn)?;
         let operation_approvals = operation_request.operation_approvals(conn)?;
-        Ok((operation_request, operation_approvals))
+        let proposed_keyholders = operation_request.proposed_keyholders(conn)?;
+        Ok((operation_request, operation_approvals, proposed_keyholders))
     }
 
     pub fn get_with_contract(
@@ -106,6 +118,26 @@ impl OperationRequest {
             .load::<(OperationApproval, User)>(conn)
     }
 
+    pub fn proposed_keyholders(
+        &self,
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+    ) -> Result<Option<Vec<User>>, diesel::result::Error> {
+        let kind: OperationRequestKind = self.kind.try_into().expect("kind needs to be valid");
+        if kind != OperationRequestKind::UpdateKeyholders {
+            return Ok(None);
+        }
+        let proposed_keyholders = ProposedUser::belonging_to(self)
+            .inner_join(users::table)
+            .load::<(ProposedUser, User)>(conn)?;
+
+        Ok(Some(
+            proposed_keyholders
+                .into_iter()
+                .map(|proposed| proposed.1)
+                .collect::<Vec<User>>(),
+        ))
+    }
+
     pub fn delete_and_fix_next_nonces(
         &self,
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
@@ -158,7 +190,12 @@ impl OperationRequest {
         limit: i64,
     ) -> Result<
         (
-            Vec<(OperationRequest, User, Vec<(OperationApproval, User)>)>,
+            Vec<(
+                OperationRequest,
+                User,
+                Vec<(OperationApproval, User)>,
+                Option<Vec<User>>,
+            )>,
             i64,
         ),
         diesel::result::Error,
@@ -190,6 +227,7 @@ impl OperationRequest {
                 .map(|operation_approval| &operation_approval.keyholder_id)
                 .collect(),
         )?;
+
         let operation_approvals_and_keyholders: Vec<(OperationApproval, User)> =
             operation_approvals
                 .into_iter()
@@ -205,16 +243,69 @@ impl OperationRequest {
         let grouped_operation_approvals: Vec<Vec<(OperationApproval, User)>> =
             operation_approvals_and_keyholders.grouped_by(&operation_requests);
 
-        let operation_requests_and_users: Vec<(OperationRequest, User)> =
-            operation_requests.into_iter().zip(users).collect();
-        let result: Vec<(OperationRequest, User, Vec<(OperationApproval, User)>)> =
-            operation_requests_and_users
+        let mut proposed_keyholders: Option<Vec<Vec<(ProposedUser, User)>>> = None;
+        if kind == OperationRequestKind::UpdateKeyholders {
+            let proposed_users: Vec<ProposedUser> =
+                ProposedUser::belonging_to(&operation_requests).load(conn)?;
+
+            let users = User::get_all_with_ids(
+                conn,
+                proposed_users
+                    .iter()
+                    .map(|proposed| &proposed.user_id)
+                    .collect(),
+            )?;
+
+            let proposed_users_and_users: Vec<(ProposedUser, User)> = proposed_users
                 .into_iter()
-                .zip(grouped_operation_approvals)
-                .map(|((operation_request, user), operation_approvals)| {
-                    (operation_request, user, operation_approvals)
+                .map(|proposed| {
+                    let user = users
+                        .iter()
+                        .find(|user| user.id == proposed.user_id)
+                        .unwrap();
+
+                    (proposed, user.clone())
                 })
                 .collect();
+
+            let grouped_proposed_keyholders: Vec<Vec<(ProposedUser, User)>> =
+                proposed_users_and_users.grouped_by(&operation_requests);
+
+            proposed_keyholders = Some(grouped_proposed_keyholders)
+        }
+
+        let operation_requests_and_users: Vec<(OperationRequest, User)> =
+            operation_requests.into_iter().zip(users).collect();
+        let mut result: Vec<(
+            OperationRequest,
+            User,
+            Vec<(OperationApproval, User)>,
+            Option<Vec<User>>,
+        )> = operation_requests_and_users
+            .into_iter()
+            .zip(grouped_operation_approvals)
+            .map(|((operation_request, user), operation_approvals)| {
+                (operation_request, user, operation_approvals, None)
+            })
+            .collect();
+        if let Some(proposed_keyholders) = proposed_keyholders {
+            result = result
+                .into_iter()
+                .zip(proposed_keyholders)
+                .map(|(operation_request, proposed)| {
+                    let proposed_keyholders = proposed
+                        .into_iter()
+                        .map(|proposed_keyholder| proposed_keyholder.1)
+                        .collect();
+                    (
+                        operation_request.0,
+                        operation_request.1,
+                        operation_request.2,
+                        Some(proposed_keyholders),
+                    )
+                })
+                .collect();
+        }
 
         Ok((result, page_count))
     }
@@ -234,10 +325,42 @@ pub struct NewOperationRequest {
     pub gatekeeper_id: Uuid,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
-    pub amount: BigDecimal,
+    pub amount: Option<BigDecimal>,
+    pub threshold: Option<i64>,
     pub kind: i16,
     pub chain_id: String,
     pub nonce: i64,
+}
+
+impl NewOperationRequest {
+    pub fn validate(&self) -> Result<(), TzError> {
+        let operation_request_kind: OperationRequestKind = self.kind.try_into()?;
+        if self.amount.is_none()
+            && (operation_request_kind == OperationRequestKind::Mint
+                || operation_request_kind == OperationRequestKind::Burn)
+        {
+            return Err(TzError::InvalidValue {
+                description: "amount is required for mint and burn operation requests".to_owned(),
+            });
+        }
+
+        if self.target_address.is_none() && operation_request_kind == OperationRequestKind::Mint {
+            return Err(TzError::InvalidValue {
+                description: "target_address is required for mint operation requests".to_owned(),
+            });
+        }
+
+        if self.threshold.is_none()
+            && operation_request_kind == OperationRequestKind::UpdateKeyholders
+        {
+            return Err(TzError::InvalidValue {
+                description: "threshold is required for update keyholders operation requests"
+                    .to_owned(),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(AsChangeset, Debug)]

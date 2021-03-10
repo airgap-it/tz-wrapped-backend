@@ -7,7 +7,7 @@ use super::pagination::Paginate;
 use crate::api::models::error::APIError;
 use crate::db::schema::contracts;
 use crate::settings;
-use crate::tezos::contract::multisig;
+use crate::tezos::multisig;
 use crate::DbPool;
 
 #[derive(Queryable, Identifiable, Clone, Debug)]

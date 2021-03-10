@@ -5,13 +5,42 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::error::APIError;
-use crate::db::models::user::User as DBUser;
+use crate::{
+    auth::{SessionUser, SessionUserRole},
+    db::models::user::User as DBUser,
+};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthUser {
+    pub address: String,
+    pub display_name: String,
+    pub email: Option<String>,
+    pub roles: Vec<SessionUserRole>,
+}
+
+impl AuthUser {
+    pub fn from(db_user: DBUser, session_user: SessionUser) -> AuthUser {
+        AuthUser {
+            address: db_user.address,
+            display_name: db_user.display_name,
+            email: db_user.email,
+            roles: session_user.roles,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PatchAuthUser {
+    pub display_name: Option<String>,
+    pub email: Option<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub public_key: String,
     pub address: String,
     pub contract_id: Uuid,
     pub kind: UserKind,
@@ -27,6 +56,7 @@ impl TryFrom<DBUser> for User {
             id: value.id,
             created_at: value.created_at,
             updated_at: value.updated_at,
+            public_key: value.public_key,
             address: value.address,
             contract_id: value.contract_id,
             kind: value.kind.try_into()?,

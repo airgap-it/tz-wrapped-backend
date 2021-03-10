@@ -149,6 +149,7 @@ impl From<tezos::TzError> for APIError {
             tezos::TzError::InvalidPublicKey => APIError::InvalidPublicKey,
             tezos::TzError::InvalidSignature => APIError::InvalidSignature,
             tezos::TzError::InvalidValue { description } => APIError::InvalidValue { description },
+            tezos::TzError::APIError { error } => error,
             _ => APIError::Internal {
                 description: value.to_string(),
             },

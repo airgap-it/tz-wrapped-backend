@@ -8,8 +8,8 @@ node_url = "https://testnet-tezos.giganode.io"
 host = "localhost"
 
 [[contracts]]
-address = "KT1X6iAsssYNMK4YQC7ujvfAHiwqdwbac73Q"
-multisig = "KT1BAxSLXenicfoNAA6EXe8RojVpBJ3KiMCt"
+address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
+multisig = "KT1AaQrMSoK1WVtX4mAZSGXyxC2JRPBMCavM"
 name = "tzBTC"
 kind = "fa1"
 token_id = 0
@@ -31,20 +31,23 @@ name = "Picnic Give"
 email = "godenzim@me.com"
 
 [[contracts.keyholders]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
 name = "Ugly Release"
 email = "godenzim@me.com"
 
 [[contracts.keyholders]]
-name = "Thrive Umbrella"
+public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
+name = "Sudden Push"
 email = "godenzim@me.com"
 
 [[contracts.keyholders]]
-name = "Sudden Push KH"
+public_key = "edpkuwf84xZoEpu88JgprPcee4CZsj5iXzs77M65CxmQd6qqZFBNSJ"
+name = "Idea Obscure"
 email = "godenzim@me.com"
 
 [[contracts]]
-address = "KT1R9zSv54P6H4okbLQYKA6S8W3zdsKR6cTJ"
-multisig = "KT1LW1vW2XhQ2VA5xfG3cpLVVetadi65QYbP"
+address = "KT1CzBckMYTXnY4tdZqoGpjxpyaiU7EwxW2J"
+multisig = "KT1E8ZCP3NuL5TTnqkZL5oK9nMqSKrob4MWQ"
 name = "tzETH"
 kind = "fa2"
 token_id = 0
@@ -66,13 +69,16 @@ name = "Original Cluster"
 email = "godenzim@me.com"
 
 [[contracts.keyholders]]
-name = "Alice"
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+name = "Ugly Release"
 email = "mike@hypergate.com"
 
 [[contracts.keyholders]]
-name = "Robert"
+public_key = "edpkv6MFhAVnpAhrvMjdW1tGfLDDiU6i6P9kt3ZmyiiMpxCsB5Cg4v"
+name = "Thrive Umbrella"
 email = "godenzim@me.com"
 
 [[contracts.keyholders]]
-name = "Dan"
+public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
+name = "Sudden Push"
 email = "godenzim@me.com"

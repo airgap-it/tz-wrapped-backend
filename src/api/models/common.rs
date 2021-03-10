@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
 
-use crate::tezos::contract::multisig::SignableMessage;
+use crate::tezos::multisig::SignableMessage;
 
 use super::error::APIError;
 

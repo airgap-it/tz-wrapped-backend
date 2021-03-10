@@ -55,6 +55,7 @@ pub struct Gatekeeper {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Keyholder {
+    pub public_key: String,
     pub name: String,
     pub email: String,
 }

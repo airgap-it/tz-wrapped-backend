@@ -30,6 +30,7 @@ pub async fn sign_in(
             None,
             Some(UserState::Active),
             Some(&challenge.address),
+            None,
         )?;
 
         Ok((challenge, users))
@@ -60,7 +61,7 @@ pub async fn sign_in(
     })
     .await?;
 
-    let session_user = SessionUser::new(authentication_challenge.address.clone(), users);
+    let session_user = SessionUser::new(authentication_challenge.address.clone(), &users);
     set_current_user(&session, &session_user).map_err(|_error| APIError::Internal {
         description: "failed to set current user".into(),
     })?;
