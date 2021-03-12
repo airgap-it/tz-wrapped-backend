@@ -71,6 +71,7 @@ impl Contract {
             .filter(|stored_contract| {
                 let found = contracts.iter().find(|contract| {
                     contract.address == stored_contract.pkh
+                        && contract.multisig == stored_contract.multisig_pkh
                         && contract.token_id == (stored_contract.token_id as i64)
                 });
                 if let None = found {
@@ -87,6 +88,7 @@ impl Contract {
             .filter(|contract| {
                 let found = stored_contracts.iter().find(|stored_contract| {
                     stored_contract.pkh == contract.address
+                        && stored_contract.multisig_pkh == contract.multisig
                         && (stored_contract.token_id as i64) == contract.token_id
                 });
 
@@ -118,6 +120,7 @@ impl Contract {
         for contract in contracts {
             let found = stored_contracts.iter().find(|stored_contract| {
                 stored_contract.pkh == contract.address
+                    && stored_contract.multisig_pkh == contract.multisig
                     && (stored_contract.token_id as i64) == contract.token_id
             });
 
@@ -126,8 +129,7 @@ impl Contract {
                     multisig::get_multisig(&contract.multisig, contract.kind, node_url);
                 let min_approvals = multisig.min_signatures().await? as i32;
                 let contract_kind_i16: i16 = contract.kind.into();
-                let has_changes = stored_contract.multisig_pkh != contract.multisig
-                    || stored_contract.display_name != contract.name
+                let has_changes = stored_contract.display_name != contract.name
                     || stored_contract.kind != contract_kind_i16
                     || stored_contract.min_approvals != min_approvals
                     || stored_contract.decimals != contract.decimals;

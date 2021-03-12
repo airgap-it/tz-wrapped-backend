@@ -9,7 +9,7 @@ host = "localhost"
 
 [[contracts]]
 address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
-multisig = "KT1AaQrMSoK1WVtX4mAZSGXyxC2JRPBMCavM"
+multisig = "KT1WHkRut4W4jCjarMG77brvjvD6WN96arYg"
 name = "tzBTC"
 kind = "fa1"
 token_id = 0
