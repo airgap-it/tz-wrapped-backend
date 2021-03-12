@@ -65,10 +65,7 @@ impl Multisig for SpecificMultisig {
             self.michelson_transaction_parameters(contract, operation_request, proposed_keyholders);
 
         let micheline = data::pair(
-            data::pair(
-                string(operation_request.chain_id.clone()),
-                string(self.address.to_owned()),
-            ),
+            string(self.address.to_owned()),
             data::pair(int(operation_request.nonce), call),
         );
 
@@ -84,10 +81,7 @@ impl Multisig for SpecificMultisig {
             _ => Err(TzError::InvalidType),
         }?;
 
-        let schema = types::pair(
-            types::pair(types::chain_id(), types::address()),
-            signable_schema.to_owned(),
-        );
+        let schema = types::pair(types::address(), signable_schema.to_owned());
 
         Ok(SignableMessage {
             packed_data: micheline.pack(Some(&schema))?,
