@@ -11,34 +11,13 @@ symbol = "tzBTC"
 decimals = 8
 
 [[contracts.gatekeepers]]
-public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
-# name = "Ugly Release"
-# email = "godenzim@me.com"
+public_key = "edpkuM1Y5MQcBsiZqj9Lf5KhLKrZY2egsenoY7W1B4ppWUMCGVJAYJ"
 
 [[contracts.gatekeepers]]
-public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
-# name = "Sudden Push"
-# email = "godenzim@me.com"
+public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
 
 [[contracts.gatekeepers]]
-public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
-# name = "Picnic Give"
-# email = "godenzim@me.com"
-
-# [[contracts.keyholders]]
-# public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
-# name = "Ugly Release"
-# email = "godenzim@me.com"
-
-# [[contracts.keyholders]]
-# public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
-# name = "Sudden Push"
-# email = "godenzim@me.com"
-
-# [[contracts.keyholders]]
-# public_key = "edpkuwf84xZoEpu88JgprPcee4CZsj5iXzs77M65CxmQd6qqZFBNSJ"
-# name = "Idea Obscure"
-# email = "godenzim@me.com"
+public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
 [[contracts]]
 address = "KT1CzBckMYTXnY4tdZqoGpjxpyaiU7EwxW2J"
@@ -50,31 +29,10 @@ symbol = "tzETH"
 decimals = 18
 
 [[contracts.gatekeepers]]
-public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
-name = "Ugly Release"
-email = "godenzim@me.com"
+public_key = "edpkuM1Y5MQcBsiZqj9Lf5KhLKrZY2egsenoY7W1B4ppWUMCGVJAYJ"
 
 [[contracts.gatekeepers]]
-public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
-name = "Sudden Push"
-email = "godenzim@me.com"
+public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
 
 [[contracts.gatekeepers]]
-public_key = "edpkvKgKWxh5m2G1qBn4HS1VN3bF63D723Ba9eKacdSPCBzLWe1WCy"
-name = "Original Cluster"
-email = "godenzim@me.com"
-
-# [[contracts.keyholders]]
-# public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
-# name = "Ugly Release"
-# email = "mike@hypergate.com"
-
-# [[contracts.keyholders]]
-# public_key = "edpkv6MFhAVnpAhrvMjdW1tGfLDDiU6i6P9kt3ZmyiiMpxCsB5Cg4v"
-# name = "Thrive Umbrella"
-# email = "godenzim@me.com"
-
-# [[contracts.keyholders]]
-# public_key = "edpktwdcwT8iMDWcg2ePJ6J1sbwXYdn7GYJWyRybi8vpkrv4aduFHt"
-# name = "Sudden Push"
-# email = "godenzim@me.com"
+public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
