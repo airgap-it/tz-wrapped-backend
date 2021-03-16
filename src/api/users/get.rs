@@ -19,7 +19,9 @@ use crate::{
     },
     auth::get_current_user,
 };
-use crate::{db::models::user::User as DBUser, settings};
+use crate::{
+    db::models::contract::Contract, db::models::user::User as DBUser, db::sync_keyholders, settings,
+};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -35,19 +37,29 @@ pub async fn users(
     pool: web::Data<DbPool>,
     query: Query<Info>,
     server_settings: web::Data<settings::Server>,
+    contract_settings: web::Data<Vec<settings::Contract>>,
+    tezos_settings: web::Data<settings::Tezos>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
     let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
+    let contract_id = query.contract_id;
+    current_user.require_roles(vec![UserKind::Gatekeeper, UserKind::Keyholder], contract_id)?;
 
-    current_user.require_roles(
-        vec![UserKind::Gatekeeper, UserKind::Keyholder],
-        query.contract_id,
-    )?;
+    let conn = pool.get()?;
+    let contract = web::block(move || Contract::get(&conn, &contract_id)).await?;
+
+    sync_keyholders(
+        &pool,
+        vec![contract],
+        &tezos_settings.node_url,
+        &contract_settings,
+    )
+    .await?;
 
     let conn = pool.get()?;
 
     let page = query.page.unwrap_or(0);
-    let limit = query.limit.unwrap_or(10);
+    let limit = query.limit.unwrap_or(100);
 
     let result = web::block(move || {
         load_users(
@@ -55,7 +67,7 @@ pub async fn users(
             page,
             limit,
             query.kind,
-            Some(query.contract_id),
+            Some(contract_id),
             query.state,
             query.address.as_ref(),
         )

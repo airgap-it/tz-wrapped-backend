@@ -27,8 +27,8 @@ pub async fn me(
         .map(|user| UpdateUser {
             id: user.id,
             state: user.state,
-            display_name: body.display_name.clone().unwrap_or(user.display_name),
-            email: body.email.clone().or(user.email),
+            display_name: body.display_name.to_owned().unwrap_or(user.display_name),
+            email: body.email.to_owned(),
         })
         .collect::<Vec<UpdateUser>>();
 

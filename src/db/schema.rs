@@ -21,6 +21,7 @@ table! {
         kind -> Int2,
         display_name -> Varchar,
         min_approvals -> Int4,
+        symbol -> Varchar,
         decimals -> Int4,
     }
 }

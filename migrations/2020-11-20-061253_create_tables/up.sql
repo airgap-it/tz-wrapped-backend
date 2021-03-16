@@ -11,9 +11,10 @@ CREATE TABLE IF NOT EXISTS contracts (
     kind                SMALLINT NOT NULL,
     display_name        VARCHAR NOT NULL,
     min_approvals       INTEGER NOT NULL,
+    symbol              VARCHAR NOT NULL,
     decimals            INTEGER NOT NULL DEFAULT 0,
 
-    UNIQUE(pkh, token_id)
+    UNIQUE(pkh, multisig_pkh, token_id)
 );
 
 CREATE TABLE IF NOT EXISTS users (

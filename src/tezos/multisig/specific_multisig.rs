@@ -72,7 +72,7 @@ impl Multisig for SpecificMultisig {
         let main_parameter_schema = self.fetch_main_parameter_schema().await?;
         let signable_schema = match &main_parameter_schema {
             MichelsonV1Expression::Prim(value) => {
-                if value.prim != Primitive::Type(Type::Pair) && value.args_count() == 2 {
+                if value.prim != Primitive::Type(Type::Pair) || value.args_count() != 2 {
                     return Err(TzError::InvalidType);
                 }
 
@@ -236,7 +236,7 @@ impl SpecificMultisig {
         threshold: i64,
         keyholders: Vec<User>,
     ) -> MichelsonV1Expression {
-        data::right(data::right(data::pair(
+        data::right(data::pair(
             int(threshold),
             sequence(
                 keyholders
@@ -244,6 +244,6 @@ impl SpecificMultisig {
                     .map(|keyholder| string(keyholder.public_key))
                     .collect(),
             ),
-        )))
+        ))
     }
 }

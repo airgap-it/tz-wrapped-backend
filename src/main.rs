@@ -128,10 +128,10 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api/v1")
                     .data(CONFIG.tezos.clone())
                     .data(CONFIG.server.clone())
+                    .data(CONFIG.contracts.clone())
                     .configure(api::contracts::api_config)
                     .configure(api::users::api_config)
                     .configure(api::operation_requests::api_config)
-                    .data(CONFIG.contracts.clone())
                     .configure(api::operation_approvals::api_config)
                     .configure(api::authentication::api_config),
             )
@@ -179,8 +179,8 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
                         .into_iter()
                         .map(|gatekeeper| SyncUser {
                             public_key: gatekeeper.public_key.clone(),
-                            display_name: gatekeeper.name.clone(),
-                            email: Some(gatekeeper.email.clone()),
+                            display_name: gatekeeper.name.clone().unwrap_or("".into()),
+                            email: gatekeeper.email.clone(),
                         })
                         .collect::<Vec<SyncUser>>()
                         .as_ref(),

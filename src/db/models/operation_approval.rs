@@ -1,5 +1,8 @@
-use crate::db::models::{operation_request::OperationRequest, user::User};
 use crate::db::schema::*;
+use crate::{
+    api::models::user::UserState,
+    db::models::{operation_request::OperationRequest, user::User},
+};
 use chrono::NaiveDateTime;
 use diesel::{prelude::*, r2d2::ConnectionManager, PgConnection};
 use r2d2::PooledConnection;
@@ -26,6 +29,8 @@ impl OperationApproval {
     ) -> Result<i64, diesel::result::Error> {
         let count = operation_approvals::dsl::operation_approvals
             .filter(operation_approvals::dsl::operation_request_id.eq(operation_request_id))
+            .inner_join(users::table)
+            .filter(users::dsl::state.eq::<i16>(UserState::Active.into()))
             .count()
             .get_result::<i64>(conn)?;
 

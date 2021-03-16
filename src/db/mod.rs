@@ -16,7 +16,7 @@ use self::models::{
 pub mod models;
 pub mod schema;
 
-pub async fn sync_keyholders<'a>(
+pub async fn sync_keyholders(
     pool: &DbPool,
     contracts: Vec<Contract>,
     node_url: &str,
@@ -43,17 +43,22 @@ pub async fn sync_keyholders<'a>(
             .await?
             .into_iter()
             .map(|public_key| {
-                let keyholder_settings = contract_settings
-                    .keyholders
-                    .iter()
-                    .find(|keyholder| &keyholder.public_key == public_key);
+                let keyholder_settings =
+                    contract_settings
+                        .keyholders
+                        .as_ref()
+                        .and_then(|keyholders| {
+                            keyholders
+                                .iter()
+                                .find(|keyholder| &keyholder.public_key == public_key)
+                        });
 
                 SyncUser {
                     public_key: public_key.clone(),
                     display_name: keyholder_settings
-                        .map(|kh| kh.name.clone())
+                        .map(|kh| kh.name.clone().unwrap_or("".into()))
                         .unwrap_or("".into()),
-                    email: keyholder_settings.map(|kh| kh.email.clone()),
+                    email: keyholder_settings.and_then(|kh| kh.email.clone()),
                 }
             })
             .collect();

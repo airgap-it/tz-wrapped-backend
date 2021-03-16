@@ -3,7 +3,7 @@ use chrono::NaiveDateTime;
 use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
 use uuid::Uuid;
 
-use super::pagination::Paginate;
+use super::{operation_request::OperationRequest, pagination::Paginate};
 use crate::api::models::error::APIError;
 use crate::db::schema::contracts;
 use crate::settings;
@@ -21,6 +21,7 @@ pub struct Contract {
     pub kind: i16,
     pub display_name: String,
     pub min_approvals: i32,
+    pub symbol: String,
     pub decimals: i32,
 }
 
@@ -112,11 +113,13 @@ impl Contract {
                 kind: contract.kind.into(),
                 display_name: contract.name.clone(),
                 min_approvals,
+                symbol: contract.symbol.clone(),
                 decimals: contract.decimals,
             })
         }
 
         let mut to_update = Vec::<UpdateContract>::new();
+        let mut contracts_with_higher_threshold = Vec::<Uuid>::new();
         for contract in contracts {
             let found = stored_contracts.iter().find(|stored_contract| {
                 stored_contract.pkh == contract.address
@@ -140,7 +143,10 @@ impl Contract {
                         kind: contract.kind.into(),
                         display_name: contract.name.clone(),
                         min_approvals,
-                    })
+                    });
+                    if stored_contract.min_approvals < min_approvals {
+                        contracts_with_higher_threshold.push(stored_contract.id)
+                    }
                 }
             }
         }
@@ -172,6 +178,9 @@ impl Contract {
                         .set(update)
                         .execute(&conn)?;
                 }
+                for contract_id in contracts_with_higher_threshold {
+                    OperationRequest::fix_approved_state(&conn, &contract_id)?;
+                }
             }
 
             Ok(changes)
@@ -191,6 +200,7 @@ pub struct NewContract {
     pub kind: i16,
     pub display_name: String,
     pub min_approvals: i32,
+    pub symbol: String,
     pub decimals: i32,
 }
 

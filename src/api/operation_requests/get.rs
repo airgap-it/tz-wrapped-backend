@@ -50,7 +50,7 @@ pub async fn operation_requests(
     let conn = pool.get()?;
 
     let page = query.page.unwrap_or(0);
-    let limit = query.limit.unwrap_or(10);
+    let limit = query.limit.unwrap_or(100);
     let kind = query.kind;
     let contract_id = query.contract_id;
 
