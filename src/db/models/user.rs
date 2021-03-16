@@ -326,6 +326,7 @@ pub struct NewUser {
 }
 
 #[derive(AsChangeset, Debug)]
+#[changeset_options(treat_none_as_null = "true")]
 #[table_name = "users"]
 pub struct UpdateUser {
     pub id: Uuid,

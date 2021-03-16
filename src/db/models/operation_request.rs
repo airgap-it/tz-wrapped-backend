@@ -6,13 +6,13 @@ use diesel::{prelude::*, r2d2::ConnectionManager, r2d2::PooledConnection};
 use uuid::Uuid;
 
 use crate::{
-    api::models::operation_request::OperationRequestKind,
-    db::schema::{contracts, operation_requests, users},
-    tezos::TzError,
-};
-use crate::{
     api::models::operation_request::OperationRequestState,
     db::models::{contract::Contract, operation_approval::OperationApproval, user::User},
+};
+use crate::{
+    api::models::{operation_request::OperationRequestKind, user::UserState},
+    db::schema::{contracts, operation_requests, users},
+    tezos::TzError,
 };
 
 use super::{pagination::Paginate, proposed_user::ProposedUser};
@@ -113,9 +113,16 @@ impl OperationRequest {
         &self,
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Result<Vec<(OperationApproval, User)>, diesel::result::Error> {
-        OperationApproval::belonging_to(self)
+        let mut query = OperationApproval::belonging_to(self)
             .inner_join(users::table)
-            .load::<(OperationApproval, User)>(conn)
+            .into_boxed();
+
+        let injected_state: i16 = OperationRequestState::Injected.into();
+        if self.state != injected_state {
+            query = query.filter(users::dsl::state.eq::<i16>(UserState::Active.into()))
+        }
+
+        query.load::<(OperationApproval, User)>(conn)
     }
 
     pub fn proposed_keyholders(
@@ -168,6 +175,37 @@ impl OperationRequest {
 
             Ok(())
         })?;
+
+        Ok(())
+    }
+
+    pub fn fix_approved_state(
+        conn: &PooledConnection<ConnectionManager<PgConnection>>,
+        contract_id: &Uuid,
+    ) -> Result<(), diesel::result::Error> {
+        let contract = Contract::get(conn, contract_id)?;
+        let min_approvals: i64 = contract.min_approvals.into();
+        let operation_requests_to_fix = operation_requests::table
+            .filter(
+                operation_requests::dsl::state.eq::<i16>(OperationRequestState::Approved.into()),
+            )
+            .filter(operation_requests::dsl::contract_id.eq(contract_id))
+            .load::<OperationRequest>(conn)?
+            .into_iter()
+            .filter(|operation_request| {
+                let approvals_count =
+                    OperationApproval::count(conn, &operation_request.id).unwrap_or(0);
+                approvals_count < min_approvals
+            })
+            .map(|operation_request| operation_request.id)
+            .collect::<Vec<Uuid>>();
+
+        let _ = diesel::update(
+            operation_requests::table
+                .filter(operation_requests::dsl::id.eq_any(operation_requests_to_fix)),
+        )
+        .set(operation_requests::dsl::state.eq::<i16>(OperationRequestState::Open.into()))
+        .execute(conn)?;
 
         Ok(())
     }
@@ -240,8 +278,25 @@ impl OperationRequest {
                     (operation_approval, keyholder.clone())
                 })
                 .collect();
+
+        let injected_state: i16 = OperationRequestState::Injected.into();
+        let active_state: i16 = UserState::Active.into();
         let grouped_operation_approvals: Vec<Vec<(OperationApproval, User)>> =
-            operation_approvals_and_keyholders.grouped_by(&operation_requests);
+            operation_approvals_and_keyholders
+                .grouped_by(&operation_requests)
+                .into_iter()
+                .enumerate()
+                .map(|(index, approvals)| {
+                    let operation_request = &operation_requests[index];
+                    if operation_request.state == injected_state {
+                        return approvals;
+                    }
+                    return approvals
+                        .into_iter()
+                        .filter(|(_, user)| user.state == active_state)
+                        .collect::<Vec<(OperationApproval, User)>>();
+                })
+                .collect::<Vec<_>>();
 
         let mut proposed_keyholders: Option<Vec<Vec<(ProposedUser, User)>>> = None;
         if kind == OperationRequestKind::UpdateKeyholders {

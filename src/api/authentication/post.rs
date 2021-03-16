@@ -4,7 +4,9 @@ use actix_session::Session;
 use actix_web::{web, HttpResponse};
 
 use crate::{
-    api::models::{authentication::AuthenticationChallengeResponse, error::APIError},
+    api::models::{
+        authentication::AuthenticationChallengeResponse, error::APIError, user::AuthUser,
+    },
     auth::{set_current_user, SessionUser},
     db::models::authentication_challenge::AuthenticationChallenge,
 };
@@ -61,10 +63,10 @@ pub async fn sign_in(
     })
     .await?;
 
-    let session_user = SessionUser::new(authentication_challenge.address.clone(), &users);
+    let session_user = SessionUser::new(authentication_challenge.address.to_owned(), &users);
     set_current_user(&session, &session_user).map_err(|_error| APIError::Internal {
         description: "failed to set current user".into(),
     })?;
 
-    Ok(HttpResponse::Ok().json(session_user))
+    Ok(HttpResponse::Ok().json(AuthUser::from(user.to_owned(), session_user)))
 }

@@ -47,7 +47,7 @@ pub async fn operation_approvals(
     )?;
 
     let page = query.page.unwrap_or(0);
-    let limit = query.limit.unwrap_or(10);
+    let limit = query.limit.unwrap_or(100);
 
     let conn = pool.get()?;
     let result =

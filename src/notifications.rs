@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use bigdecimal::BigDecimal;
 use lettre::smtp::ConnectionReuseParameters;
 use lettre::ClientSecurity;
@@ -34,7 +36,6 @@ pub fn notify_new_operation_request(
         .amount
         .as_ref()
         .map(|amount| amount.as_bigint_and_exponent().0);
-    // .map_or(Ok(None), |r| r.map(Some))?;
 
     let human_readable_amount = amount
         .map(|amount| BigDecimal::new(amount, contract.decimals.into()).to_string())
@@ -45,11 +46,12 @@ pub fn notify_new_operation_request(
     } else {
         target_address_line = "".into();
     }
+    let operation_request_kind: OperationRequestKind = operation_request.kind.try_into()?;
     send_email(
         destinations,
         format!(
             "New {} {} operation request",
-            contract.display_name, operation_request.kind
+            contract.display_name, operation_request_kind
         ),
         format!(
 "\
@@ -77,10 +79,10 @@ The output of the above command should show the following data.<br>
 </body>
 </html>
 ",
-            operation_request.kind,
+            operation_request_kind,
             contract.display_name,
             gatekeeper.display_name,
-            operation_request.kind,
+            operation_request_kind,
             human_readable_amount.trim_end_matches("0").trim_end_matches("."),
             contract.display_name,
             target_address_line,

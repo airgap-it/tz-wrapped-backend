@@ -42,22 +42,23 @@ pub struct Contract {
     pub kind: ContractKind,
     pub token_id: i64,
     pub gatekeepers: Vec<Gatekeeper>,
-    pub keyholders: Vec<Keyholder>,
+    pub keyholders: Option<Vec<Keyholder>>,
+    pub symbol: String,
     pub decimals: i32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Gatekeeper {
     pub public_key: String,
-    pub name: String,
-    pub email: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Keyholder {
     pub public_key: String,
-    pub name: String,
-    pub email: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
