@@ -29,14 +29,17 @@ pub async fn sync_keyholders(
             node_url,
         );
 
-        let contract_settings = contract_settings
-            .iter()
-            .find(|contract_settings| {
-                contract_settings.address == contract.pkh
-                    && contract_settings.multisig == contract.multisig_pkh
-                    && contract_settings.token_id == (contract.token_id as i64)
-            })
-            .expect("corresponding contract settings must be found");
+        let contract_settings = contract_settings.iter().find(|contract_settings| {
+            contract_settings.address == contract.pkh
+                && contract_settings.multisig == contract.multisig_pkh
+                && contract_settings.token_id == (contract.token_id as i64)
+        });
+        if contract_settings.is_none() {
+            return Err(APIError::Internal {
+                description: format!("could not find settings for contract {}", contract.pkh),
+            });
+        }
+        let contract_settings = contract_settings.unwrap();
 
         let keyholders: Vec<_> = multisig
             .approvers()
