@@ -175,30 +175,40 @@ impl From<num_bigint::ParseBigIntError> for APIError {
 
 impl From<lettre::smtp::error::Error> for APIError {
     fn from(_: lettre::smtp::error::Error) -> Self {
-        APIError::Unknown
+        APIError::Internal {
+            description: "SMTP error".into(),
+        }
     }
 }
 
 impl From<lettre::error::Error> for APIError {
     fn from(_: lettre::error::Error) -> Self {
-        APIError::Unknown
+        APIError::Internal {
+            description: "failed to create email".into(),
+        }
     }
 }
 
 impl From<lettre_email::error::Error> for APIError {
     fn from(_: lettre_email::error::Error) -> Self {
-        APIError::Unknown
+        APIError::Internal {
+            description: "failed to create email".into(),
+        }
     }
 }
 
 impl From<native_tls::Error> for APIError {
     fn from(_: native_tls::Error) -> Self {
-        APIError::Unknown
+        APIError::Internal {
+            description: "TLS error".into(),
+        }
     }
 }
 
 impl From<ParseIntError> for APIError {
     fn from(_: ParseIntError) -> Self {
-        APIError::Unknown
+        APIError::InvalidValue {
+            description: "cannot properly parse Int".into(),
+        }
     }
 }

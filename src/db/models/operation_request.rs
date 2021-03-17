@@ -152,6 +152,11 @@ impl OperationRequest {
         conn.transaction::<_, diesel::result::Error, _>(|| {
             Self::delete(conn, &self.id)?;
 
+            let injected_state: i16 = OperationRequestState::Injected.into();
+            if self.state == injected_state {
+                return Ok(());
+            }
+
             let updated_operation_requests: Vec<OperationRequest> = diesel::update(
                 operation_requests::table
                     .filter(operation_requests::dsl::nonce.gt(self.nonce))

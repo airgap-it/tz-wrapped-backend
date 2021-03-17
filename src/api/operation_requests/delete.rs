@@ -43,13 +43,6 @@ pub async fn operation_request(
         operation_request.contract_id,
     )?;
 
-    let operation_request_state: OperationRequestState = operation_request.state.try_into()?;
-    if operation_request_state == OperationRequestState::Injected {
-        return Err(APIError::InvalidOperationState {
-            description: "cannot delete operation with injected state".into(),
-        });
-    }
-
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
         contract.kind.try_into()?,
