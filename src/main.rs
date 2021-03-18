@@ -164,6 +164,7 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
         let gatekeepers = &contract.gatekeepers;
         let stored_contract = stored_contracts.iter().find(|stored_contract| {
             stored_contract.pkh == contract.address
+                && stored_contract.multisig_pkh == contract.multisig
                 && (stored_contract.token_id as i64) == contract.token_id
         });
 

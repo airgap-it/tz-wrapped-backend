@@ -220,17 +220,17 @@ impl User {
     ) -> Result<usize, APIError> {
         let stored_users = User::get_all(conn, Some(kind), Some(contract_id), None, None, None)?;
 
+        let inactive_state: i16 = UserState::Inactive.into();
         let to_deactivate: Vec<_> = stored_users
             .iter()
             .filter(|stored_user| {
+                if stored_user.state == inactive_state {
+                    return false;
+                }
                 let found = users
                     .iter()
                     .find(|user| user.public_key == stored_user.public_key);
-                if let Some(_user) = found {
-                    false
-                } else {
-                    true
-                }
+                return found.is_none();
             })
             .map(|user| &user.id)
             .collect();
@@ -241,12 +241,7 @@ impl User {
                 let found = stored_users
                     .iter()
                     .find(|stored_user| user.public_key == stored_user.public_key);
-
-                if let None = found {
-                    true
-                } else {
-                    false
-                }
+                return found.is_none();
             })
             .map(|user| {
                 Ok(NewUser {
@@ -268,17 +263,12 @@ impl User {
                 let found = stored_users.iter().find(|stored_user| {
                     stored_user.public_key == user.public_key && stored_user.state == inactive
                 });
-
-                if let Some(stored_user) = found {
-                    Some(UpdateUser {
-                        id: stored_user.id,
-                        state: UserState::Active.into(),
-                        display_name: stored_user.display_name.clone(),
-                        email: stored_user.email.clone(),
-                    })
-                } else {
-                    None
-                }
+                return found.map(|stored_user| UpdateUser {
+                    id: stored_user.id,
+                    state: UserState::Active.into(),
+                    display_name: stored_user.display_name.clone(),
+                    email: stored_user.email.clone(),
+                });
             })
             .collect();
 
