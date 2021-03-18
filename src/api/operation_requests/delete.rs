@@ -10,7 +10,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    api::models::{error::APIError, operation_request::OperationRequestState, user::UserKind},
+    api::models::{error::APIError, user::UserKind},
     auth::get_current_user,
     db::models::operation_request::OperationRequest,
     settings,
