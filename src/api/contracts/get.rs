@@ -68,7 +68,8 @@ pub async fn contract(
     let conn = pool.get()?;
     let contract_id = path.id;
 
-    let contract = web::block(move || DBContract::get(&conn, &contract_id)).await?;
+    let contract =
+        web::block(move || DBContract::get_with_capabilities(&conn, &contract_id)).await?;
 
     Ok(HttpResponse::Ok().json(Contract::try_from(contract)?))
 }

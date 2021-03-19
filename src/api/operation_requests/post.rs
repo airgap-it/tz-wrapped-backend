@@ -43,9 +43,21 @@ pub async fn operation_request(
     let contract_id = new_operation_request.contract_id;
 
     current_user.require_roles(vec![UserKind::Gatekeeper], contract_id)?;
-
+    let operation_request_kind: i16 = new_operation_request.kind.into();
     let (contract, max_local_nonce) = web::block::<_, _, APIError>(move || {
-        let contract = Contract::get(&conn, &contract_id)?;
+        let (contract, capabilities) = Contract::get_with_capabilities(&conn, &contract_id)?;
+        let capability = capabilities
+            .iter()
+            .find(|cap| cap.operation_request_kind == operation_request_kind);
+        if capability.is_none() {
+            let kind: OperationRequestKind = operation_request_kind.try_into().unwrap();
+            return Err(APIError::InvalidOperationRequest {
+                description: format!(
+                    "The multisig contract does not support operation requests of kind {}",
+                    kind
+                ),
+            });
+        }
         let max_nonce = DBOperationRequest::max_nonce(&conn, &contract.id).unwrap_or(-1);
 
         Ok((contract, max_nonce))

@@ -10,7 +10,7 @@ use crate::db::models::{
     operation_approval::OperationApproval as DBOperationApproval,
     operation_request::OperationRequest, user::User,
 };
-use crate::notifications::notify_min_approvals_received;
+use crate::notifications::{notify_approval_received, notify_min_approvals_received};
 use crate::settings;
 use crate::tezos::multisig;
 use crate::DbPool;
@@ -61,8 +61,8 @@ pub async fn operation_approval(
     let keyholder =
         find_and_validate_keyholder(&pool, current_user, &signable_message, &contract, &body)
             .await?;
-
-    let inserted_approval = store_approval(&pool, keyholder.id, body.into_inner()).await?;
+    let keyholder_id = keyholder.id;
+    let inserted_approval = store_approval(&pool, keyholder_id, body.into_inner()).await?;
 
     let result = OperationApproval::from(inserted_approval, keyholder)?;
 
@@ -73,24 +73,41 @@ pub async fn operation_approval(
 
     let conn = pool.get()?;
     if total_approvals >= min_approvals {
-        web::block(move || {
-            let result = OperationRequest::mark_approved(&conn, &request_id);
+        web::block::<_, _, APIError>(move || {
+            OperationRequest::mark_approved(&conn, &request_id)?;
 
-            if result.is_ok() {
-                let gatekeeper = User::get(&conn, operation_request.gatekeeper_id);
-                if let Ok(gatekeeper) = gatekeeper {
-                    let _notification_result = notify_min_approvals_received(
+            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id);
+            let keyholders = User::get_all_active(&conn, contract.id, UserKind::Keyholder);
+            if let Ok(gatekeeper) = gatekeeper {
+                if let Ok(keyholders) = keyholders {
+                    let _ = notify_min_approvals_received(
                         &gatekeeper,
-                        operation_request.kind.try_into().unwrap(),
+                        &keyholders,
                         &operation_request,
                         &contract,
                     );
                 }
             }
 
-            result
+            Ok(())
         })
         .await?;
+    } else {
+        let _ = web::block::<_, _, APIError>(move || {
+            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let keyholders = User::get_all_active(&conn, contract.id, UserKind::Keyholder)?;
+            let approver = User::get(&conn, keyholder_id)?;
+            let _ = notify_approval_received(
+                &gatekeeper,
+                &approver,
+                &keyholders,
+                &operation_request,
+                &contract,
+            );
+
+            Ok(())
+        })
+        .await;
     }
 
     Ok(HttpResponse::Ok().json(result))

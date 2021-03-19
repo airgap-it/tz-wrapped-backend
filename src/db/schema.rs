@@ -11,6 +11,15 @@ table! {
 }
 
 table! {
+    capabilities (id) {
+        id -> Uuid,
+        created_at -> Timestamp,
+        contract_id -> Uuid,
+        operation_request_kind -> Int2,
+    }
+}
+
+table! {
     contracts (id) {
         id -> Uuid,
         created_at -> Timestamp,
@@ -59,7 +68,6 @@ table! {
     proposed_users (id) {
         id -> Uuid,
         created_at -> Timestamp,
-        updated_at -> Timestamp,
         user_id -> Uuid,
         operation_request_id -> Uuid,
     }
@@ -80,6 +88,7 @@ table! {
     }
 }
 
+joinable!(capabilities -> contracts (contract_id));
 joinable!(operation_approvals -> operation_requests (operation_request_id));
 joinable!(operation_approvals -> users (keyholder_id));
 joinable!(operation_requests -> contracts (contract_id));
@@ -90,6 +99,7 @@ joinable!(users -> contracts (contract_id));
 
 allow_tables_to_appear_in_same_query!(
     authentication_challenges,
+    capabilities,
     contracts,
     operation_approvals,
     operation_requests,

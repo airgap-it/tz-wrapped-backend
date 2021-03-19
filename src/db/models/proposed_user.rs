@@ -11,7 +11,6 @@ use crate::db::schema::*;
 pub struct ProposedUser {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
     pub user_id: Uuid,
     pub operation_request_id: Uuid,
 }

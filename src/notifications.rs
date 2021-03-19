@@ -30,28 +30,20 @@ pub fn notify_new_operation_request(
     let destinations = keyholders
         .iter()
         .flat_map(|user| user.email.clone())
-        .collect();
+        .collect::<Vec<_>>();
 
-    let amount = operation_request
-        .amount
-        .as_ref()
-        .map(|amount| amount.as_bigint_and_exponent().0);
-
-    let human_readable_amount = amount
-        .map(|amount| BigDecimal::new(amount, contract.decimals.into()).to_string())
-        .unwrap_or("0".to_owned());
-    let target_address_line: String;
-    if let Some(target_address) = operation_request.target_address.as_ref() {
-        target_address_line = format!("<b>To:</b> {}", target_address)
-    } else {
-        target_address_line = "".into();
+    if destinations.is_empty() {
+        return Ok(());
     }
+
+    let amount_line = amount_line(operation_request, contract);
+    let target_address_line = target_address_line(operation_request);
     let operation_request_kind: OperationRequestKind = operation_request.kind.try_into()?;
     send_email(
         destinations,
         format!(
-            "New {} {} operation request",
-            contract.display_name, operation_request_kind
+            "{}: New {} operation request #{}",
+            contract.display_name, operation_request_kind, operation_request.nonce
         ),
         format!(
 "\
@@ -59,12 +51,12 @@ pub fn notify_new_operation_request(
 <head/>
 <body>
 <p>
-A new {} operation request for {} is waiting for approval.<br>
+A new {} operation request #{} for {} is waiting for approval.<br>
 <br>
 <b>Created by:</b> {}<br>
 <b>Kind:</b> {}<br>
-<b>Amount:</b> {} {}<br>
-{}<br>
+{}
+{}
 <br>
 To reproduce the hash shown by the ledger when approving this operation, use the following tezos-client command.<br>
 <pre>{}</pre>
@@ -80,11 +72,11 @@ The output of the above command should show the following data.<br>
 </html>
 ",
             operation_request_kind,
+            operation_request.nonce,
             contract.display_name,
-            gatekeeper.display_name,
+            if !gatekeeper.display_name.is_empty() { &gatekeeper.display_name } else { &gatekeeper.address },
             operation_request_kind,
-            human_readable_amount.trim_end_matches("0").trim_end_matches("."),
-            contract.display_name,
+            amount_line,
             target_address_line,
             signable_message.tezos_client_command,
             signable_message.message,
@@ -93,59 +85,184 @@ The output of the above command should show the following data.<br>
     )
 }
 
-pub fn notify_min_approvals_received(
-    user: &User,
-    kind: OperationRequestKind,
+pub fn notify_approval_received(
+    gatekeeper: &User,
+    approver: &User,
+    keyholders: &Vec<User>,
     operation_request: &OperationRequest,
     contract: &Contract,
 ) -> Result<(), APIError> {
-    if let Some(to_email) = user.email.as_ref() {
-        let human_readable_amount = operation_request
-            .amount
-            .as_ref()
-            .map(|amount| {
-                BigDecimal::new(amount.as_bigint_and_exponent().0, contract.decimals.into())
-                    .to_string()
-            })
-            .unwrap_or("0".to_owned());
-        let target_address_line: String;
-        if let Some(target_address) = operation_request.target_address.as_ref() {
-            target_address_line = format!("<b>To:</b> {}", target_address)
-        } else {
-            target_address_line = "".into();
-        }
+    let mut destinations = keyholders
+        .iter()
+        .flat_map(|user| {
+            if user.id == approver.id {
+                return None;
+            }
+            user.email.clone()
+        })
+        .collect::<Vec<_>>();
+    if let Some(gatekeeper_email) = gatekeeper.email.as_ref() {
+        destinations.push(gatekeeper_email.clone())
+    }
+    if destinations.is_empty() {
+        return Ok(());
+    }
 
-        send_email(
-            vec![to_email.clone()],
-            format!("{} operation request approved", contract.display_name),
-            format!(
-                "\
+    let amount_line = amount_line(operation_request, contract);
+    let target_address_line = target_address_line(operation_request);
+    let operation_request_kind: OperationRequestKind = operation_request.kind.try_into()?;
+    send_email(
+        destinations,
+        format!(
+            "{}: {} operation request #{} recieved an approval",
+            contract.display_name, operation_request_kind, operation_request.nonce
+        ),
+        format!(
+            "\
 <html>
 <head/>
 <body>
 <p>
-The {} operation request for {} has been approved and it is ready to be injected.<br>
+The {} operation request #{} for {} has received an approval from {}.<br>
 <br>
+<b>Created by:</b> {}<br>
 <b>Kind:</b> {}<br>
-<b>Amount:</b> {} {}<br>
-{}<br>
+{}
+{}
 </p>
 </body>
 </html>
 ",
-                kind,
-                contract.display_name,
-                kind,
-                human_readable_amount
-                    .trim_end_matches("0")
-                    .trim_end_matches("."),
-                contract.display_name,
-                target_address_line
-            ),
-        )
-    } else {
-        Ok(())
+            operation_request_kind,
+            operation_request.nonce,
+            contract.display_name,
+            if !approver.display_name.is_empty() {
+                &approver.display_name
+            } else {
+                &approver.address
+            },
+            if !gatekeeper.display_name.is_empty() {
+                &gatekeeper.display_name
+            } else {
+                &gatekeeper.address
+            },
+            operation_request_kind,
+            amount_line,
+            target_address_line
+        ),
+    )
+}
+
+pub fn notify_min_approvals_received(
+    gatekeeper: &User,
+    keyholders: &Vec<User>,
+    operation_request: &OperationRequest,
+    contract: &Contract,
+) -> Result<(), APIError> {
+    let mut destinations = keyholders
+        .iter()
+        .flat_map(|user| user.email.clone())
+        .collect::<Vec<_>>();
+    if let Some(gatekeeper_email) = gatekeeper.email.as_ref() {
+        destinations.push(gatekeeper_email.clone())
     }
+    if destinations.is_empty() {
+        return Ok(());
+    }
+    let amount_line = amount_line(operation_request, contract);
+    let target_address_line = target_address_line(operation_request);
+    let operation_request_kind: OperationRequestKind = operation_request.kind.try_into()?;
+    send_email(
+        destinations,
+        format!(
+            "{}: {} operation request #{} fully approved",
+            contract.display_name, operation_request_kind, operation_request.nonce
+        ),
+        format!(
+            "\
+<html>
+<head/>
+<body>
+<p>
+The {} operation request #{} for {} has been approved and it is ready to be injected.<br>
+<br>
+<b>Created by:</b> {}<br>
+<b>Kind:</b> {}<br>
+{}
+{}
+</p>
+</body>
+</html>
+",
+            operation_request_kind,
+            operation_request.nonce,
+            contract.display_name,
+            if !gatekeeper.display_name.is_empty() {
+                &gatekeeper.display_name
+            } else {
+                &gatekeeper.address
+            },
+            operation_request_kind,
+            amount_line,
+            target_address_line
+        ),
+    )
+}
+
+pub fn notify_injection(
+    gatekeeper: &User,
+    keyholders: &Vec<User>,
+    operation_request: &OperationRequest,
+    contract: &Contract,
+) -> Result<(), APIError> {
+    let destinations = keyholders
+        .iter()
+        .flat_map(|user| user.email.clone())
+        .collect::<Vec<_>>();
+    if destinations.is_empty() {
+        return Ok(());
+    }
+    let amount_line = amount_line(operation_request, contract);
+    let target_address_line = target_address_line(operation_request);
+    let operation_hash_line = operation_hash_line(operation_request);
+    let operation_request_kind: OperationRequestKind = operation_request.kind.try_into()?;
+    send_email(
+        destinations,
+        format!(
+            "{}: {} operation request #{} injected",
+            contract.display_name, operation_request_kind, operation_request.nonce
+        ),
+        format!(
+            "\
+<html>
+<head/>
+<body>
+<p>
+The {} operation request #{} for {} has been injected.<br>
+<br>
+<b>Created by:</b> {}<br>
+<b>Kind:</b> {}<br>
+{}
+{}
+{}
+</p>
+</body>
+</html>
+",
+            operation_request_kind,
+            operation_request.nonce,
+            contract.display_name,
+            if !gatekeeper.display_name.is_empty() {
+                &gatekeeper.display_name
+            } else {
+                &gatekeeper.address
+            },
+            operation_request_kind,
+            amount_line,
+            target_address_line,
+            operation_hash_line
+        ),
+    )
 }
 
 pub fn send_email(
@@ -185,4 +302,36 @@ pub fn send_email(
     let _result = mailer.send(email.into());
 
     Ok(())
+}
+
+fn amount_line(operation_request: &OperationRequest, contract: &Contract) -> String {
+    let amount = operation_request
+        .amount
+        .as_ref()
+        .map(|amount| amount.as_bigint_and_exponent().0);
+
+    let human_readable_amount =
+        amount.map(|amount| BigDecimal::new(amount, contract.decimals.into()).to_string());
+    match human_readable_amount {
+        Some(amount) => format!(
+            "<b>Amount:</b> {} {}<br>",
+            amount.trim_end_matches("0").trim_end_matches("."),
+            contract.symbol
+        ),
+        None => "".into(),
+    }
+}
+
+fn target_address_line(operation_request: &OperationRequest) -> String {
+    match operation_request.target_address.as_ref() {
+        Some(target_address) => format!("<b>To:</b> {}<br>", target_address),
+        None => "".into(),
+    }
+}
+
+fn operation_hash_line(operation_request: &OperationRequest) -> String {
+    match operation_request.operation_hash.as_ref() {
+        Some(operation_hash) => format!("<b>Operation Group Hash:</b> {}<br>", operation_hash),
+        None => "".into(),
+    }
 }

@@ -8,6 +8,7 @@ use actix_web::{
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::notifications::notify_injection;
 use crate::tezos::coding::validate_operation_hash;
 use crate::DbPool;
 use crate::{
@@ -19,7 +20,9 @@ use crate::{
     auth::get_current_user,
 };
 use crate::{
-    db::models::{operation_request::OperationRequest as DBOperationRequest, user::User},
+    db::models::{
+        contract::Contract, operation_request::OperationRequest as DBOperationRequest, user::User,
+    },
     settings,
 };
 
@@ -69,17 +72,32 @@ pub async fn operation_request(
                     ),
                 });
             }
-            DBOperationRequest::mark_injected(
+            let updated_operation_request = DBOperationRequest::mark_injected(
                 &conn,
                 &operation_request_id,
                 patch_operation_request.operation_hash.clone(),
             )?;
 
-            let updated_operation = DBOperationRequest::get(&conn, &operation_request_id)?;
             let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let keyholders = User::get_all_active(
+                &conn,
+                updated_operation_request.contract_id,
+                UserKind::Keyholder,
+            );
+            if let Ok(keyholders) = keyholders {
+                let contract = Contract::get(&conn, &updated_operation_request.contract_id);
+                if let Ok(contract) = contract {
+                    let _ = notify_injection(
+                        &gatekeeper,
+                        &keyholders,
+                        &updated_operation_request,
+                        &contract,
+                    );
+                }
+            }
 
             Ok((
-                updated_operation,
+                updated_operation_request,
                 gatekeeper,
                 operation_approvals,
                 proposed_keyholders,
