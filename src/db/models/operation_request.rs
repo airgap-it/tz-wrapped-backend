@@ -86,15 +86,13 @@ impl OperationRequest {
         conn: &PooledConnection<ConnectionManager<PgConnection>>,
         id: &Uuid,
         operation_hash: Option<String>,
-    ) -> Result<(), diesel::result::Error> {
-        let _result = diesel::update(operation_requests::table.find(id))
+    ) -> Result<OperationRequest, diesel::result::Error> {
+        diesel::update(operation_requests::table.find(id))
             .set((
                 operation_requests::dsl::state.eq::<i16>(OperationRequestState::Injected.into()),
                 operation_requests::dsl::operation_hash.eq(operation_hash),
             ))
-            .execute(conn)?;
-
-        Ok(())
+            .get_result(conn)
     }
 
     pub fn max_nonce(
@@ -423,7 +421,7 @@ impl NewOperationRequest {
     }
 }
 
-#[derive(AsChangeset, Debug)]
+#[derive(AsChangeset, Identifiable, Debug)]
 #[table_name = "operation_requests"]
 pub struct UpdateOperation {
     pub id: Uuid,

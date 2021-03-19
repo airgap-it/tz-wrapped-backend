@@ -3,7 +3,7 @@ use std::fmt;
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
-use crate::api::models::contract::ContractKind;
+use crate::api::models::{contract::ContractKind, operation_request::OperationRequestKind};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Server {
@@ -43,8 +43,14 @@ pub struct Contract {
     pub token_id: i64,
     pub gatekeepers: Vec<Gatekeeper>,
     pub keyholders: Option<Vec<Keyholder>>,
+    pub capabilities: Vec<Capability>,
     pub symbol: String,
     pub decimals: i32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Capability {
+    pub operation_request_kind: OperationRequestKind,
 }
 
 #[derive(Debug, Deserialize, Clone)]

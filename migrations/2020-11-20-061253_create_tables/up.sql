@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS contracts (
     UNIQUE(pkh, multisig_pkh, token_id)
 );
 
+SELECT diesel_manage_updated_at('contracts');
+
 CREATE TABLE IF NOT EXISTS users (
     id                  uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -32,6 +34,8 @@ CREATE TABLE IF NOT EXISTS users (
     UNIQUE(public_key, contract_id, kind),
     FOREIGN KEY(contract_id) REFERENCES contracts(id) ON DELETE CASCADE
 );
+
+SELECT diesel_manage_updated_at('users');
 
 CREATE TABLE IF NOT EXISTS operation_requests (
     id                  uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -53,6 +57,8 @@ CREATE TABLE IF NOT EXISTS operation_requests (
     FOREIGN KEY(contract_id) REFERENCES contracts(id) ON DELETE CASCADE
 );
 
+SELECT diesel_manage_updated_at('operation_requests');
+
 CREATE TABLE IF NOT EXISTS operation_approvals (
     id                      uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -66,10 +72,11 @@ CREATE TABLE IF NOT EXISTS operation_approvals (
     FOREIGN KEY(operation_request_id) REFERENCES operation_requests(id) ON DELETE CASCADE
 );
 
+SELECT diesel_manage_updated_at('operation_approvals');
+
 CREATE TABLE IF NOT EXISTS proposed_users (
     id                      uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     user_id                 uuid NOT NULL,
     operation_request_id    uuid NOT NULL,
 
@@ -86,4 +93,16 @@ CREATE TABLE IF NOT EXISTS authentication_challenges (
     address             VARCHAR NOT NULL,
     challenge           VARCHAR NOT NULL,
     state               SMALLINT NOT NULL DEFAULT 0
+);
+
+SELECT diesel_manage_updated_at('authentication_challenges');
+
+CREATE TABLE IF NOT EXISTS capabilities (
+    id                      uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    contract_id             uuid NOT NULL,
+    operation_request_kind  SMALLINT NOT NULL,
+
+    UNIQUE(contract_id, operation_request_kind),
+    FOREIGN KEY(contract_id) REFERENCES contracts(id) ON DELETE CASCADE
 );

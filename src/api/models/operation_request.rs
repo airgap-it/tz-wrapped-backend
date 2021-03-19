@@ -158,9 +158,9 @@ impl Into<i16> for OperationRequestKind {
 impl Display for OperationRequestKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value: &str = match self {
-            OperationRequestKind::Mint => MINT,
-            OperationRequestKind::Burn => BURN,
-            OperationRequestKind::UpdateKeyholders => UPDATE_KEYHOLDERS,
+            OperationRequestKind::Mint => "Mint",
+            OperationRequestKind::Burn => "Burn",
+            OperationRequestKind::UpdateKeyholders => "Multi Signature Update",
         };
         write!(f, "{}", value)
     }
