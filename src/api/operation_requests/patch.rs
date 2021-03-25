@@ -78,7 +78,7 @@ pub async fn operation_request(
                 patch_operation_request.operation_hash.clone(),
             )?;
 
-            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let user = User::get(&conn, operation_request.user_id)?;
             let keyholders = User::get_all_active(
                 &conn,
                 updated_operation_request.contract_id,
@@ -87,18 +87,14 @@ pub async fn operation_request(
             if let Ok(keyholders) = keyholders {
                 let contract = Contract::get(&conn, &updated_operation_request.contract_id);
                 if let Ok(contract) = contract {
-                    let _ = notify_injection(
-                        &gatekeeper,
-                        &keyholders,
-                        &updated_operation_request,
-                        &contract,
-                    );
+                    let _ =
+                        notify_injection(&user, &keyholders, &updated_operation_request, &contract);
                 }
             }
 
             Ok((
                 updated_operation_request,
-                gatekeeper,
+                user,
                 operation_approvals,
                 proposed_keyholders,
             ))

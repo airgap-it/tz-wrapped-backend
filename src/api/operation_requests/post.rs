@@ -41,8 +41,11 @@ pub async fn operation_request(
 
     let conn = pool.get()?;
     let contract_id = new_operation_request.contract_id;
-
-    current_user.require_roles(vec![UserKind::Gatekeeper], contract_id)?;
+    let required_user_kind = match new_operation_request.kind {
+        OperationRequestKind::UpdateKeyholders => UserKind::Keyholder,
+        _ => UserKind::Gatekeeper,
+    };
+    current_user.require_roles(vec![required_user_kind], contract_id)?;
     let operation_request_kind: i16 = new_operation_request.kind.into();
     let (contract, max_local_nonce) = web::block::<_, _, APIError>(move || {
         let (contract, capabilities) = Contract::get_with_capabilities(&conn, &contract_id)?;
@@ -84,15 +87,15 @@ pub async fn operation_request(
         web::block::<_, _, APIError>(move || {
             conn.transaction(|| {
                 let new_operation_request = new_operation_request.into_inner();
-                let gatekeeper = User::get_active(
+                let user = User::get_active(
                     &conn,
                     &current_user.address,
-                    UserKind::Gatekeeper,
+                    required_user_kind,
                     contract_id,
                 )?;
 
                 let operation = DBNewOperationRequest {
-                    gatekeeper_id: gatekeeper.id,
+                    user_id: user.id,
                     contract_id: new_operation_request.contract_id,
                     target_address: new_operation_request.target_address.clone(),
                     amount: amount.map(|amount| BigDecimal::new(amount, 0)),
@@ -167,7 +170,7 @@ pub async fn operation_request(
                     }
                 }
 
-                Ok((operation_request, gatekeeper, proposed_keyholder_users))
+                Ok((operation_request, user, proposed_keyholder_users))
             })
         })
         .await?;
@@ -193,10 +196,10 @@ pub async fn operation_request(
         let operation_request = DBOperationRequest::get(&conn, &operation_request_id)?;
         let contract = Contract::get(&conn, &operation_request.contract_id)?;
         let keyholders = User::get_all_active(&conn, contract.id, UserKind::Keyholder)?;
-        let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+        let user = User::get(&conn, operation_request.user_id)?;
         let signable_message = signable_message.try_into()?;
         let _ = notify_new_operation_request(
-            &gatekeeper,
+            &user,
             &keyholders,
             &operation_request,
             &signable_message,

@@ -137,7 +137,7 @@ pub async fn operation_request(
     let conn = pool.get()?;
     let id = path.id;
 
-    let (operation_request, gatekeeper, operation_approvals, proposed_keyholders) =
+    let (operation_request, user, operation_approvals, proposed_keyholders) =
         web::block::<_, _, APIError>(move || {
             let (operation_request, operation_approvals, proposed_keyholders) =
                 DBOperationRequest::get_with_operation_approvals(&conn, &id)?;
@@ -147,11 +147,11 @@ pub async fn operation_request(
                 operation_request.contract_id,
             )?;
 
-            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let user = User::get(&conn, operation_request.user_id)?;
 
             Ok((
                 operation_request,
-                gatekeeper,
+                user,
                 operation_approvals,
                 proposed_keyholders,
             ))
@@ -160,7 +160,7 @@ pub async fn operation_request(
 
     Ok(HttpResponse::Ok().json(OperationRequest::from(
         operation_request,
-        gatekeeper,
+        user,
         operation_approvals,
         proposed_keyholders,
     )?))

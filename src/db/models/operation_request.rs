@@ -11,20 +11,20 @@ use crate::{
 };
 use crate::{
     api::models::{operation_request::OperationRequestKind, user::UserState},
-    db::schema::{contracts, operation_requests, users},
+    db::schema::{contracts, operation_requests, proposed_users, users},
     tezos::TzError,
 };
 
 use super::{pagination::Paginate, proposed_user::ProposedUser};
 
 #[derive(Queryable, Identifiable, Associations, Debug)]
-#[belongs_to(User, foreign_key = "gatekeeper_id")]
+#[belongs_to(User, foreign_key = "user_id")]
 #[belongs_to(Contract, foreign_key = "contract_id")]
 pub struct OperationRequest {
     pub id: Uuid,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub gatekeeper_id: Uuid,
+    pub user_id: Uuid,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
     pub amount: Option<BigDecimal>,
@@ -132,6 +132,7 @@ impl OperationRequest {
             return Ok(None);
         }
         let proposed_keyholders = ProposedUser::belonging_to(self)
+            .order_by(proposed_users::dsl::position)
             .inner_join(users::table)
             .load::<(ProposedUser, User)>(conn)?;
 
@@ -350,7 +351,8 @@ impl OperationRequest {
             result = result
                 .into_iter()
                 .zip(proposed_keyholders)
-                .map(|(operation_request, proposed)| {
+                .map(|(operation_request, mut proposed)| {
+                    proposed.sort_unstable_by(|a, b| a.0.position.cmp(&b.0.position));
                     let proposed_keyholders = proposed
                         .into_iter()
                         .map(|proposed_keyholder| proposed_keyholder.1)
@@ -380,7 +382,7 @@ impl OperationRequest {
 #[derive(Insertable, Debug)]
 #[table_name = "operation_requests"]
 pub struct NewOperationRequest {
-    pub gatekeeper_id: Uuid,
+    pub user_id: Uuid,
     pub contract_id: Uuid,
     pub target_address: Option<String>,
     pub amount: Option<BigDecimal>,

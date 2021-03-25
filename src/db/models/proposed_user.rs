@@ -13,6 +13,7 @@ pub struct ProposedUser {
     pub created_at: NaiveDateTime,
     pub user_id: Uuid,
     pub operation_request_id: Uuid,
+    pub position: i32,
 }
 
 impl ProposedUser {
@@ -32,9 +33,11 @@ impl ProposedUser {
     ) -> Result<usize, diesel::result::Error> {
         let new_proposed_users: Vec<NewProposedUser> = users
             .iter()
-            .map(|user| NewProposedUser {
+            .enumerate()
+            .map(|(position, user)| NewProposedUser {
                 user_id: user.id,
                 operation_request_id: operation_request.id,
+                position: position as i32,
             })
             .collect();
 
@@ -49,4 +52,5 @@ impl ProposedUser {
 pub struct NewProposedUser {
     pub user_id: Uuid,
     pub operation_request_id: Uuid,
+    pub position: i32,
 }
