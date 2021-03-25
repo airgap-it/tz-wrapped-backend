@@ -76,12 +76,12 @@ pub async fn operation_approval(
         web::block::<_, _, APIError>(move || {
             OperationRequest::mark_approved(&conn, &request_id)?;
 
-            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id);
+            let user = User::get(&conn, operation_request.user_id);
             let keyholders = User::get_all_active(&conn, contract.id, UserKind::Keyholder);
-            if let Ok(gatekeeper) = gatekeeper {
+            if let Ok(user) = user {
                 if let Ok(keyholders) = keyholders {
                     let _ = notify_min_approvals_received(
-                        &gatekeeper,
+                        &user,
                         &keyholders,
                         &operation_request,
                         &contract,
@@ -94,11 +94,11 @@ pub async fn operation_approval(
         .await?;
     } else {
         let _ = web::block::<_, _, APIError>(move || {
-            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let user = User::get(&conn, operation_request.user_id)?;
             let keyholders = User::get_all_active(&conn, contract.id, UserKind::Keyholder)?;
             let approver = User::get(&conn, keyholder_id)?;
             let _ = notify_approval_received(
-                &gatekeeper,
+                &user,
                 &approver,
                 &keyholders,
                 &operation_request,

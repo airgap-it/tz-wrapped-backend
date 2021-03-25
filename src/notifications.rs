@@ -21,7 +21,7 @@ use crate::{
 };
 
 pub fn notify_new_operation_request(
-    gatekeeper: &User,
+    user: &User,
     keyholders: &Vec<User>,
     operation_request: &OperationRequest,
     signable_message: &SignableMessageInfo,
@@ -29,6 +29,7 @@ pub fn notify_new_operation_request(
 ) -> Result<(), APIError> {
     let destinations = keyholders
         .iter()
+        .filter(|keyholder| keyholder.id != user.id)
         .flat_map(|user| user.email.clone())
         .collect::<Vec<_>>();
 
@@ -74,7 +75,7 @@ The output of the above command should show the following data.<br>
             operation_request_kind,
             operation_request.nonce,
             contract.display_name,
-            if !gatekeeper.display_name.is_empty() { &gatekeeper.display_name } else { &gatekeeper.address },
+            if !user.display_name.is_empty() { &user.display_name } else { &user.address },
             operation_request_kind,
             amount_line,
             target_address_line,
@@ -86,7 +87,7 @@ The output of the above command should show the following data.<br>
 }
 
 pub fn notify_approval_received(
-    gatekeeper: &User,
+    user: &User,
     approver: &User,
     keyholders: &Vec<User>,
     operation_request: &OperationRequest,
@@ -94,15 +95,15 @@ pub fn notify_approval_received(
 ) -> Result<(), APIError> {
     let mut destinations = keyholders
         .iter()
-        .flat_map(|user| {
-            if user.id == approver.id {
+        .flat_map(|keyholder| {
+            if keyholder.id == approver.id || keyholder.id == user.id {
                 return None;
             }
-            user.email.clone()
+            keyholder.email.clone()
         })
         .collect::<Vec<_>>();
-    if let Some(gatekeeper_email) = gatekeeper.email.as_ref() {
-        destinations.push(gatekeeper_email.clone())
+    if let Some(user_email) = user.email.as_ref() {
+        destinations.push(user_email.clone())
     }
     if destinations.is_empty() {
         return Ok(());
@@ -141,10 +142,10 @@ The {} operation request #{} for {} has received an approval from {}.<br>
             } else {
                 &approver.address
             },
-            if !gatekeeper.display_name.is_empty() {
-                &gatekeeper.display_name
+            if !user.display_name.is_empty() {
+                &user.display_name
             } else {
-                &gatekeeper.address
+                &user.address
             },
             operation_request_kind,
             amount_line,
@@ -154,17 +155,18 @@ The {} operation request #{} for {} has received an approval from {}.<br>
 }
 
 pub fn notify_min_approvals_received(
-    gatekeeper: &User,
+    user: &User,
     keyholders: &Vec<User>,
     operation_request: &OperationRequest,
     contract: &Contract,
 ) -> Result<(), APIError> {
     let mut destinations = keyholders
         .iter()
-        .flat_map(|user| user.email.clone())
+        .filter(|keyholder| keyholder.id != user.id)
+        .flat_map(|keyholder| keyholder.email.clone())
         .collect::<Vec<_>>();
-    if let Some(gatekeeper_email) = gatekeeper.email.as_ref() {
-        destinations.push(gatekeeper_email.clone())
+    if let Some(user_email) = user.email.as_ref() {
+        destinations.push(user_email.clone())
     }
     if destinations.is_empty() {
         return Ok(());
@@ -197,10 +199,10 @@ The {} operation request #{} for {} has been approved and it is ready to be inje
             operation_request_kind,
             operation_request.nonce,
             contract.display_name,
-            if !gatekeeper.display_name.is_empty() {
-                &gatekeeper.display_name
+            if !user.display_name.is_empty() {
+                &user.display_name
             } else {
-                &gatekeeper.address
+                &user.address
             },
             operation_request_kind,
             amount_line,
@@ -210,15 +212,19 @@ The {} operation request #{} for {} has been approved and it is ready to be inje
 }
 
 pub fn notify_injection(
-    gatekeeper: &User,
+    user: &User,
     keyholders: &Vec<User>,
     operation_request: &OperationRequest,
     contract: &Contract,
 ) -> Result<(), APIError> {
-    let destinations = keyholders
+    let mut destinations = keyholders
         .iter()
-        .flat_map(|user| user.email.clone())
+        .filter(|keyholder| keyholder.id != user.id)
+        .flat_map(|keyholder| keyholder.email.clone())
         .collect::<Vec<_>>();
+    if let Some(user_email) = user.email.as_ref() {
+        destinations.push(user_email.clone())
+    }
     if destinations.is_empty() {
         return Ok(());
     }
@@ -252,10 +258,10 @@ The {} operation request #{} for {} has been injected.<br>
             operation_request_kind,
             operation_request.nonce,
             contract.display_name,
-            if !gatekeeper.display_name.is_empty() {
-                &gatekeeper.display_name
+            if !user.display_name.is_empty() {
+                &user.display_name
             } else {
-                &gatekeeper.address
+                &user.address
             },
             operation_request_kind,
             amount_line,

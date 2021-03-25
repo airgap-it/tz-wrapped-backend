@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS operation_requests (
     id                  uuid NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    gatekeeper_id       uuid NOT NULL,
+    user_id             uuid NOT NULL,
     contract_id         uuid NOT NULL,
     target_address      VARCHAR DEFAULT NULL,
     amount              NUMERIC(1000, 0) DEFAULT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS operation_requests (
     operation_hash      VARCHAR DEFAULT NULL,
 
     UNIQUE(contract_id, nonce),
-    FOREIGN KEY(gatekeeper_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(contract_id) REFERENCES contracts(id) ON DELETE CASCADE
 );
 
@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS proposed_users (
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     user_id                 uuid NOT NULL,
     operation_request_id    uuid NOT NULL,
+    position                INTEGER NOT NULL,
 
     UNIQUE(user_id, operation_request_id),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,

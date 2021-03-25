@@ -51,7 +51,7 @@ table! {
         id -> Uuid,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        gatekeeper_id -> Uuid,
+        user_id -> Uuid,
         contract_id -> Uuid,
         target_address -> Nullable<Varchar>,
         amount -> Nullable<Numeric>,
@@ -70,6 +70,7 @@ table! {
         created_at -> Timestamp,
         user_id -> Uuid,
         operation_request_id -> Uuid,
+        position -> Int4,
     }
 }
 
@@ -92,7 +93,7 @@ joinable!(capabilities -> contracts (contract_id));
 joinable!(operation_approvals -> operation_requests (operation_request_id));
 joinable!(operation_approvals -> users (keyholder_id));
 joinable!(operation_requests -> contracts (contract_id));
-joinable!(operation_requests -> users (gatekeeper_id));
+joinable!(operation_requests -> users (user_id));
 joinable!(proposed_users -> operation_requests (operation_request_id));
 joinable!(proposed_users -> users (user_id));
 joinable!(users -> contracts (contract_id));
