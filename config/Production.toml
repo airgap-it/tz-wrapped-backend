@@ -20,7 +20,7 @@ public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
 public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
 
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
+address = "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
 multisig = "KT1FcmdSroia1ys1WM6mL2rzB1haLxyy3MH9"
 name = "tzBTC - Operator"
 kind = "fa1"
