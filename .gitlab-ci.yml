@@ -194,7 +194,7 @@ drop-db-production:
     - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
     - gcloud config set account $GCLOUD_ACCOUNT
     - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set compute/zone $GCLOUD_ZONE_PRODUCTION
+    - gcloud config set compute/zone $GCLOUD_ZONE
     - gcloud container clusters get-credentials papers-cluster-production
     - export STOLON_PROXY=$(kubectl get pods --all-namespaces | grep stolon-proxy | awk 'NR==1{print $2}')
   script:
