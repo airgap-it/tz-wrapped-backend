@@ -13,7 +13,7 @@ spec:
       secretName: tz-wrapped-prod-tls
     - hosts:
         - foundry-backend.wrappedtz.io
-        secretName: foundry-backend-tls
+      secretName: foundry-backend-tls
   rules:
     - host: tz-wrapped.prod.gke.papers.tech
       http:
