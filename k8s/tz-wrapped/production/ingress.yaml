@@ -11,8 +11,17 @@ spec:
     - hosts:
         - tz-wrapped.prod.gke.papers.tech
       secretName: tz-wrapped-prod-tls
+    - hosts:
+        - foundry-backend.wrappedtz.io
+        secretName: foundry-backend-tls
   rules:
     - host: tz-wrapped.prod.gke.papers.tech
+      http:
+        paths:
+          - backend:
+              serviceName: tz-wrapped-backend
+              servicePort: 80
+    - host: foundry-backend.wrappedtz.io
       http:
         paths:
           - backend:

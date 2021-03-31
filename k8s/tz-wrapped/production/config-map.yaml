@@ -4,7 +4,7 @@ metadata:
   name: tz-wrapped-backend-config-map
   namespace: tz-wrapped
 data:
-  TZW_SERVER__DOMAIN_NAME: "tz-wrapped.prod.gke.papers.tech"
+  TZW_SERVER__DOMAIN_NAME: "foundry-backend.wrappedtz.io"
   TZW_DATABASE__NAME: __DB_NAME_PRODUCTION__
   TZW_DATABASE__HOST: __DB_HOST_PRODUCTION__
   TZW_SMTP__HOST: __SMTP_HOST__

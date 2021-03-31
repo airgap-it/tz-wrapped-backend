@@ -4,10 +4,41 @@ node_url = "https://mainnet-tezos.giganode.io"
 [[contracts]]
 address = "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
 multisig = "KT1QeoDkCAdJSSnm7zWz6Nv7W82qaoUz7kC9"
-name = "tzBTC"
+name = "tzBTC - Owner"
 kind = "fa1"
 token_id = 0
+symbol = "tzBTC"
 decimals = 8
 
+[[contracts.capabilities]]
+operation_request_kind = "update_keyholders"
+
 [[contracts.gatekeepers]]
-[[contracts.keyholders]]
+public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
+
+[[contracts]]
+address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
+multisig = "KT1FcmdSroia1ys1WM6mL2rzB1haLxyy3MH9"
+name = "tzBTC - Operator"
+kind = "fa1"
+token_id = 0
+symbol = "tzBTC"
+decimals = 8
+
+[[contracts.capabilities]]
+operation_request_kind = "mint"
+
+[[contracts.capabilities]]
+operation_request_kind = "burn"
+
+[[contracts.capabilities]]
+operation_request_kind = "update_keyholders"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
