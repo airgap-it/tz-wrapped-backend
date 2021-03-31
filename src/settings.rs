@@ -3,12 +3,13 @@ use std::fmt;
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
-use crate::api::models::contract::ContractKind;
+use crate::api::models::{contract::ContractKind, operation_request::OperationRequestKind};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Server {
     pub address: String,
     pub domain_name: String,
+    pub inactivity_timeout_seconds: i64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -41,21 +42,29 @@ pub struct Contract {
     pub kind: ContractKind,
     pub token_id: i64,
     pub gatekeepers: Vec<Gatekeeper>,
-    pub keyholders: Vec<Keyholder>,
+    pub keyholders: Option<Vec<Keyholder>>,
+    pub capabilities: Vec<Capability>,
+    pub symbol: String,
     pub decimals: i32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Capability {
+    pub operation_request_kind: OperationRequestKind,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Gatekeeper {
     pub public_key: String,
-    pub name: String,
-    pub email: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Keyholder {
-    pub name: String,
-    pub email: String,
+    pub public_key: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

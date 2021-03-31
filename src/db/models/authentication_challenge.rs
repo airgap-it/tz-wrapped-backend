@@ -73,7 +73,7 @@ pub struct NewAuthenticationChallenge {
     pub challenge: String,
 }
 
-#[derive(AsChangeset, Debug)]
+#[derive(AsChangeset, Identifiable, Debug)]
 #[table_name = "authentication_challenges"]
 pub struct UpdateOperation {
     pub id: Uuid,

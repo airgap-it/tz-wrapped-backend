@@ -1,10 +1,9 @@
-use std::{convert::TryFrom, fmt::Display};
-
 use serde::{Deserialize, Serialize};
+use std::{convert::TryFrom, fmt::Display};
 
 use super::{
     super::utils,
-    primitive::{Instruction, Primitive, Type},
+    primitive::{self, Instruction, Primitive, Type},
     HexDecodable, HexEncodable, MichelsonV1Expression, TzError,
 };
 
@@ -96,6 +95,26 @@ impl Prim {
                 _ => Ok(self.clone()),
             },
             _ => Err(TzError::InvalidType),
+        }
+    }
+
+    pub fn normalized(self) -> Self {
+        match self.prim {
+            Primitive::Data(primitive::Data::Pair) | Primitive::Type(primitive::Type::Pair) => {
+                if self.args_count() > 2 {
+                    let mut args = self.args.unwrap();
+                    let first = args.remove(0);
+                    let second = Prim::new(self.prim, Some(args), None).normalized();
+                    Prim::new(
+                        self.prim,
+                        Some(vec![first, MichelsonV1Expression::Prim(second)]),
+                        self.annots,
+                    )
+                } else {
+                    self
+                }
+            }
+            _ => self,
         }
     }
 

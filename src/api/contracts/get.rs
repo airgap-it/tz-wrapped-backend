@@ -5,12 +5,12 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::models::contract::Contract as DBContract;
 use crate::settings;
-use crate::tezos::contract::multisig;
+use crate::tezos::multisig;
 use crate::DbPool;
 use crate::{
     api::models::{common::ListResponse, contract::Contract, error::APIError},
+    db::models::contract::Contract as DBContract,
     db::models::operation_request::OperationRequest,
 };
 
@@ -23,11 +23,15 @@ pub struct Info {
 pub async fn contracts(
     pool: web::Data<DbPool>,
     query: Query<Info>,
+    contract_settings: web::Data<Vec<settings::Contract>>,
+    tezos_settings: web::Data<settings::Tezos>,
 ) -> Result<HttpResponse, APIError> {
+    DBContract::sync_contracts(&pool, &contract_settings, &tezos_settings.node_url).await?;
+
     let conn = pool.get()?;
 
     let page = query.page.unwrap_or(0);
-    let limit = query.limit.unwrap_or(10);
+    let limit = query.limit.unwrap_or(100);
 
     let result = web::block(move || load_contracts(&conn, page, limit)).await?;
 
@@ -64,7 +68,8 @@ pub async fn contract(
     let conn = pool.get()?;
     let contract_id = path.id;
 
-    let contract = web::block(move || DBContract::get(&conn, &contract_id)).await?;
+    let contract =
+        web::block(move || DBContract::get_with_capabilities(&conn, &contract_id)).await?;
 
     Ok(HttpResponse::Ok().json(Contract::try_from(contract)?))
 }

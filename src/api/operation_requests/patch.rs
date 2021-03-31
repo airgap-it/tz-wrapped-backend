@@ -8,7 +8,7 @@ use actix_web::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::models::{operation_request::OperationRequest as DBOperationRequest, user::User};
+use crate::notifications::notify_injection;
 use crate::tezos::coding::validate_operation_hash;
 use crate::DbPool;
 use crate::{
@@ -18,6 +18,12 @@ use crate::{
         user::UserKind,
     },
     auth::get_current_user,
+};
+use crate::{
+    db::models::{
+        contract::Contract, operation_request::OperationRequest as DBOperationRequest, user::User,
+    },
+    settings,
 };
 
 #[derive(Deserialize)]
@@ -29,9 +35,10 @@ pub async fn operation_request(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
     patch_operation_request: web::Json<PatchOperationRequest>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let operation_request_id = path.id;
@@ -45,9 +52,9 @@ pub async fn operation_request(
         })?;
     }
 
-    let (updated_operation, gatekeeper, operation_approvals) =
+    let (updated_operation, gatekeeper, operation_approvals, proposed_keyholders) =
         web::block::<_, _, APIError>(move || {
-            let (operation_request, operation_approvals) =
+            let (operation_request, operation_approvals, proposed_keyholders) =
                 DBOperationRequest::get_with_operation_approvals(&conn, &operation_request_id)?;
 
             current_user.require_roles(
@@ -65,16 +72,32 @@ pub async fn operation_request(
                     ),
                 });
             }
-            DBOperationRequest::mark_injected(
+            let updated_operation_request = DBOperationRequest::mark_injected(
                 &conn,
                 &operation_request_id,
                 patch_operation_request.operation_hash.clone(),
             )?;
 
-            let updated_operation = DBOperationRequest::get(&conn, &operation_request_id)?;
-            let gatekeeper = User::get(&conn, operation_request.gatekeeper_id)?;
+            let user = User::get(&conn, operation_request.user_id)?;
+            let keyholders = User::get_all_active(
+                &conn,
+                updated_operation_request.contract_id,
+                UserKind::Keyholder,
+            );
+            if let Ok(keyholders) = keyholders {
+                let contract = Contract::get(&conn, &updated_operation_request.contract_id);
+                if let Ok(contract) = contract {
+                    let _ =
+                        notify_injection(&user, &keyholders, &updated_operation_request, &contract);
+                }
+            }
 
-            Ok((updated_operation, gatekeeper, operation_approvals))
+            Ok((
+                updated_operation_request,
+                user,
+                operation_approvals,
+                proposed_keyholders,
+            ))
         })
         .await?;
 
@@ -82,5 +105,6 @@ pub async fn operation_request(
         updated_operation,
         gatekeeper,
         operation_approvals,
+        proposed_keyholders,
     )?))
 }

@@ -1,20 +1,19 @@
-use std::{convert::TryInto, str::FromStr};
+use std::{collections::HashSet, convert::TryInto, str::FromStr};
 
 use actix_session::Session;
 use actix_web::{web, HttpResponse};
 use bigdecimal::BigDecimal;
-use diesel::{
-    r2d2::{ConnectionManager, PooledConnection},
-    PgConnection,
-};
+use diesel::Connection;
 use num_bigint::BigInt;
 
-use crate::tezos::contract::{get_signable_message, multisig};
+use crate::tezos::multisig;
 use crate::DbPool;
 use crate::{
     api::models::{
-        error::APIError, operation_request::NewOperationRequest,
-        operation_request::OperationRequest, user::UserKind,
+        error::APIError,
+        operation_request::OperationRequest,
+        operation_request::{NewOperationRequest, OperationRequestKind},
+        user::{UserKind, UserState},
     },
     auth::get_current_user,
 };
@@ -24,27 +23,44 @@ use crate::{
         operation_request::{
             NewOperationRequest as DBNewOperationRequest, OperationRequest as DBOperationRequest,
         },
-        user::User,
+        proposed_user::ProposedUser,
+        user::{NewUser, User},
     },
     notifications::notify_new_operation_request,
 };
-use crate::{settings, tezos};
+use crate::{settings, tezos, tezos::coding::validate_edpk};
 
-pub async fn new_operation_request(
+pub async fn operation_request(
     pool: web::Data<DbPool>,
     tezos_settings: web::Data<settings::Tezos>,
     new_operation_request: web::Json<NewOperationRequest>,
+    server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
     let contract_id = new_operation_request.contract_id;
-
-    current_user.require_roles(vec![UserKind::Gatekeeper], contract_id)?;
-
+    let required_user_kind = match new_operation_request.kind {
+        OperationRequestKind::UpdateKeyholders => UserKind::Keyholder,
+        _ => UserKind::Gatekeeper,
+    };
+    current_user.require_roles(vec![required_user_kind], contract_id)?;
+    let operation_request_kind: i16 = new_operation_request.kind.into();
     let (contract, max_local_nonce) = web::block::<_, _, APIError>(move || {
-        let contract = Contract::get(&conn, &contract_id)?;
+        let (contract, capabilities) = Contract::get_with_capabilities(&conn, &contract_id)?;
+        let capability = capabilities
+            .iter()
+            .find(|cap| cap.operation_request_kind == operation_request_kind);
+        if capability.is_none() {
+            let kind: OperationRequestKind = operation_request_kind.try_into().unwrap();
+            return Err(APIError::InvalidOperationRequest {
+                description: format!(
+                    "The multisig contract does not support operation requests of kind {}",
+                    kind
+                ),
+            });
+        }
         let max_nonce = DBOperationRequest::max_nonce(&conn, &contract.id).unwrap_or(-1);
 
         Ok((contract, max_nonce))
@@ -60,73 +76,139 @@ pub async fn new_operation_request(
     let nonce = std::cmp::max(multisig.nonce().await?, max_local_nonce + 1);
     let chain_id = tezos::chain_id(tezos_settings.node_url.as_ref()).await?;
 
-    let amount = BigInt::from_str(new_operation_request.amount.as_ref())?;
-
-    let signable_message = get_signable_message(
-        &contract,
-        new_operation_request.kind,
-        new_operation_request.target_address.as_ref(),
-        amount.clone(),
-        nonce,
-        chain_id.as_ref(),
-        &multisig,
-    )
-    .await?;
+    let amount = new_operation_request
+        .amount
+        .as_ref()
+        .map(|amount| BigInt::from_str(amount.as_ref()))
+        .map_or(Ok(None), |r| r.map(Some))?;
 
     let conn = pool.get()?;
-    let result = web::block(move || {
-        let new_operation_request = new_operation_request.into_inner();
-        let gatekeeper = User::get_active(
-            &conn,
-            &current_user.address,
-            UserKind::Gatekeeper,
-            contract_id,
-        )?;
+    let (db_operation_request, gatekeeper, proposed_keyholders) =
+        web::block::<_, _, APIError>(move || {
+            conn.transaction(|| {
+                let new_operation_request = new_operation_request.into_inner();
+                let user = User::get_active(
+                    &conn,
+                    &current_user.address,
+                    required_user_kind,
+                    contract_id,
+                )?;
 
-        let operation = DBNewOperationRequest {
-            gatekeeper_id: gatekeeper.id,
-            contract_id: new_operation_request.contract_id,
-            target_address: new_operation_request.target_address.clone(),
-            amount: BigDecimal::new(amount, 0),
-            kind: new_operation_request.kind.into(),
-            chain_id,
-            nonce,
-        };
+                let operation = DBNewOperationRequest {
+                    user_id: user.id,
+                    contract_id: new_operation_request.contract_id,
+                    target_address: new_operation_request.target_address.clone(),
+                    amount: amount.map(|amount| BigDecimal::new(amount, 0)),
+                    threshold: new_operation_request.threshold,
+                    kind: new_operation_request.kind.into(),
+                    chain_id,
+                    nonce,
+                };
 
-        let result = store_operation(&conn, &operation);
+                operation.validate()?;
 
-        if result.is_ok() {
-            let contract = Contract::get(&conn, &new_operation_request.contract_id);
-            if let Ok(contract) = contract {
-                let keyholders = User::get_all_active(&conn, contract.id, UserKind::Keyholder);
-                if let Ok(keyholders) = keyholders {
-                    if let Ok(signable_message) = signable_message.try_into() {
-                        let _notification_result = notify_new_operation_request(
-                            &gatekeeper,
-                            &keyholders,
-                            &new_operation_request,
-                            &signable_message,
-                            &contract,
-                        );
+                let operation_request = DBOperationRequest::insert(&conn, &operation)?;
+                let mut proposed_keyholder_users: Option<Vec<User>> = None;
+                if new_operation_request.kind == OperationRequestKind::UpdateKeyholders {
+                    if let Some(proposed_keyholders) = new_operation_request.proposed_keyholders {
+                        let current_keyholders = User::get_all(
+                            &conn,
+                            Some(UserKind::Keyholder),
+                            Some(new_operation_request.contract_id),
+                            None,
+                            None,
+                            None,
+                        )?;
+                        let current_keyholders_set = current_keyholders
+                            .iter()
+                            .map(|user| &user.public_key)
+                            .collect::<HashSet<_>>();
+
+                        let proposed_keyholders_set =
+                            proposed_keyholders.iter().collect::<HashSet<_>>();
+                        let mut keyholders_to_add: Vec<NewUser> = Vec::new();
+                        for public_key in
+                            proposed_keyholders_set.difference(&current_keyholders_set)
+                        {
+                            validate_edpk(public_key)?;
+                            keyholders_to_add.push(NewUser {
+                                public_key: (**public_key).clone(),
+                                address: tezos::edpk_to_tz1(public_key)?,
+                                contract_id: new_operation_request.contract_id,
+                                kind: UserKind::Keyholder.into(),
+                                display_name: "".into(),
+                                email: None,
+                                state: UserState::Inactive.into(),
+                            });
+                        }
+                        if !keyholders_to_add.is_empty() {
+                            User::insert(&conn, keyholders_to_add)?;
+                        }
+
+                        let mut keyholders = User::get_all_matching_any(
+                            &conn,
+                            new_operation_request.contract_id,
+                            UserKind::Keyholder.into(),
+                            &proposed_keyholders,
+                        )?;
+
+                        keyholders.sort_unstable_by(|first, second| {
+                            let first_position = proposed_keyholders
+                                .iter()
+                                .position(|public_key| public_key == &first.public_key)
+                                .unwrap();
+                            let second_position = proposed_keyholders
+                                .iter()
+                                .position(|public_key| public_key == &second.public_key)
+                                .unwrap();
+                            first_position.cmp(&second_position)
+                        });
+
+                        ProposedUser::insert(&conn, &operation_request, &keyholders)?;
+
+                        proposed_keyholder_users = Some(keyholders);
                     }
                 }
-            }
-        }
 
-        result
+                Ok((operation_request, user, proposed_keyholder_users))
+            })
+        })
+        .await?;
+
+    let signable_message = multisig
+        .signable_message(
+            &contract,
+            &db_operation_request,
+            proposed_keyholders.clone(),
+        )
+        .await?;
+
+    let operation_request = OperationRequest::from(
+        db_operation_request,
+        gatekeeper,
+        vec![],
+        proposed_keyholders,
+    )?;
+    let operation_request_id = operation_request.id;
+
+    let conn = pool.get()?;
+    let _ = web::block::<_, _, APIError>(move || {
+        let operation_request = DBOperationRequest::get(&conn, &operation_request_id)?;
+        let contract = Contract::get(&conn, &operation_request.contract_id)?;
+        let keyholders = User::get_all_active(&conn, contract.id, UserKind::Keyholder)?;
+        let user = User::get(&conn, operation_request.user_id)?;
+        let signable_message = signable_message.try_into()?;
+        let _ = notify_new_operation_request(
+            &user,
+            &keyholders,
+            &operation_request,
+            &signable_message,
+            &contract,
+        );
+
+        Ok(())
     })
-    .await?;
+    .await;
 
-    Ok(HttpResponse::Ok().json(result))
-}
-
-fn store_operation(
-    conn: &PooledConnection<ConnectionManager<PgConnection>>,
-    new_operation_request: &DBNewOperationRequest,
-) -> Result<OperationRequest, APIError> {
-    let inserted_operation_request = DBOperationRequest::insert(conn, new_operation_request)?;
-    let gatekeeper = User::get(conn, inserted_operation_request.gatekeeper_id)?;
-    let result = OperationRequest::from(inserted_operation_request, gatekeeper, vec![])?;
-
-    Ok(result)
+    Ok(HttpResponse::Ok().json(operation_request))
 }

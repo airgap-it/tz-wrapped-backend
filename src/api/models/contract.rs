@@ -1,12 +1,12 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::db::models::contract::Contract as DBContract;
+use crate::db::models::{capability::Capability, contract::Contract as DBContract};
 
-use super::error::APIError;
+use super::{error::APIError, operation_request::OperationRequestKind};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Contract {
@@ -19,24 +19,32 @@ pub struct Contract {
     pub kind: ContractKind,
     pub display_name: String,
     pub min_approvals: i32,
+    pub symbol: String,
     pub decimals: i32,
+    pub capabilities: Vec<OperationRequestKind>,
 }
 
-impl TryFrom<DBContract> for Contract {
+impl TryFrom<(DBContract, Vec<Capability>)> for Contract {
     type Error = APIError;
 
-    fn try_from(value: DBContract) -> Result<Self, Self::Error> {
+    fn try_from(value: (DBContract, Vec<Capability>)) -> Result<Self, Self::Error> {
+        let (contract, capabilities) = value;
         Ok(Contract {
-            id: value.id,
-            created_at: value.created_at,
-            updated_at: value.updated_at,
-            pkh: value.pkh,
-            token_id: value.token_id,
-            multisig_pkh: value.multisig_pkh,
-            kind: ContractKind::try_from(value.kind)?,
-            display_name: value.display_name,
-            min_approvals: value.min_approvals,
-            decimals: value.decimals,
+            id: contract.id,
+            created_at: contract.created_at,
+            updated_at: contract.updated_at,
+            pkh: contract.pkh,
+            token_id: contract.token_id,
+            multisig_pkh: contract.multisig_pkh,
+            kind: ContractKind::try_from(contract.kind)?,
+            display_name: contract.display_name,
+            min_approvals: contract.min_approvals,
+            symbol: contract.symbol,
+            decimals: contract.decimals,
+            capabilities: capabilities
+                .iter()
+                .map(|cap| cap.operation_request_kind.try_into())
+                .collect::<Result<Vec<OperationRequestKind>, APIError>>()?,
         })
     }
 }

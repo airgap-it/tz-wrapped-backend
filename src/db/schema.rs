@@ -11,6 +11,15 @@ table! {
 }
 
 table! {
+    capabilities (id) {
+        id -> Uuid,
+        created_at -> Timestamp,
+        contract_id -> Uuid,
+        operation_request_kind -> Int2,
+    }
+}
+
+table! {
     contracts (id) {
         id -> Uuid,
         created_at -> Timestamp,
@@ -21,6 +30,7 @@ table! {
         kind -> Int2,
         display_name -> Varchar,
         min_approvals -> Int4,
+        symbol -> Varchar,
         decimals -> Int4,
     }
 }
@@ -41,15 +51,26 @@ table! {
         id -> Uuid,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        gatekeeper_id -> Uuid,
+        user_id -> Uuid,
         contract_id -> Uuid,
         target_address -> Nullable<Varchar>,
-        amount -> Numeric,
+        amount -> Nullable<Numeric>,
+        threshold -> Nullable<Int8>,
         kind -> Int2,
         chain_id -> Varchar,
         nonce -> Int8,
         state -> Int2,
         operation_hash -> Nullable<Varchar>,
+    }
+}
+
+table! {
+    proposed_users (id) {
+        id -> Uuid,
+        created_at -> Timestamp,
+        user_id -> Uuid,
+        operation_request_id -> Uuid,
+        position -> Int4,
     }
 }
 
@@ -68,16 +89,21 @@ table! {
     }
 }
 
+joinable!(capabilities -> contracts (contract_id));
 joinable!(operation_approvals -> operation_requests (operation_request_id));
 joinable!(operation_approvals -> users (keyholder_id));
 joinable!(operation_requests -> contracts (contract_id));
-joinable!(operation_requests -> users (gatekeeper_id));
+joinable!(operation_requests -> users (user_id));
+joinable!(proposed_users -> operation_requests (operation_request_id));
+joinable!(proposed_users -> users (user_id));
 joinable!(users -> contracts (contract_id));
 
 allow_tables_to_appear_in_same_query!(
     authentication_challenges,
+    capabilities,
     contracts,
     operation_approvals,
     operation_requests,
+    proposed_users,
     users,
 );

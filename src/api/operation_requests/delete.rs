@@ -10,11 +10,11 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    api::models::{error::APIError, operation_request::OperationRequestState, user::UserKind},
+    api::models::{error::APIError, user::UserKind},
     auth::get_current_user,
     db::models::operation_request::OperationRequest,
     settings,
-    tezos::contract::multisig,
+    tezos::multisig,
     DbPool,
 };
 
@@ -28,8 +28,9 @@ pub async fn operation_request(
     path: Path<PathInfo>,
     session: Session,
     tezos_settings: web::Data<settings::Tezos>,
+    server_settings: web::Data<settings::Server>,
 ) -> Result<HttpResponse, APIError> {
-    let current_user = get_current_user(&session)?;
+    let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let operation_request_id = path.id;
     let conn = pool.get()?;
@@ -41,13 +42,6 @@ pub async fn operation_request(
         vec![UserKind::Gatekeeper, UserKind::Keyholder],
         operation_request.contract_id,
     )?;
-
-    let operation_request_state: OperationRequestState = operation_request.state.try_into()?;
-    if operation_request_state == OperationRequestState::Injected {
-        return Err(APIError::InvalidOperationState {
-            description: "cannot delete operation with injected state".into(),
-        });
-    }
 
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),

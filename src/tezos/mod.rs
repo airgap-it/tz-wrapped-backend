@@ -1,5 +1,5 @@
 pub mod coding;
-pub mod contract;
+pub mod multisig;
 pub mod micheline;
 pub mod utils;
 
@@ -7,7 +7,7 @@ use base58check::{FromBase58Check, ToBase58Check};
 use derive_more::{Display, Error};
 use sodiumoxide::crypto::sign;
 
-use crate::crypto;
+use crate::{api::models::error::APIError, crypto};
 
 #[derive(Error, Display, Debug)]
 pub enum TzError {
@@ -21,6 +21,7 @@ pub enum TzError {
     InvalidSignature,
     HashFailure,
     HexDecodingFailure,
+    APIError { error: APIError },
 }
 
 impl From<serde_json::Error> for TzError {
@@ -32,6 +33,12 @@ impl From<serde_json::Error> for TzError {
 impl From<num_bigint::ParseBigIntError> for TzError {
     fn from(_: num_bigint::ParseBigIntError) -> Self {
         TzError::ParsingFailure
+    }
+}
+
+impl From<APIError> for TzError {
+    fn from(error: APIError) -> Self {
+        TzError::APIError { error }
     }
 }
 

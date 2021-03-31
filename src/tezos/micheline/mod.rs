@@ -55,7 +55,8 @@ impl MichelsonV1Expression {
     pub fn pack(&self, schema: Option<&MichelsonV1Expression>) -> Result<String, TzError> {
         let encoded: String;
         if let Some(schema) = schema {
-            let packed = self.prepack(schema)?;
+            let normalized_schema = schema.clone().normalized();
+            let packed = self.prepack(&normalized_schema)?;
             encoded = packed.to_hex_encoded()?;
         } else {
             encoded = self.to_hex_encoded()?;
@@ -133,6 +134,13 @@ impl MichelsonV1Expression {
             }
             _ => self.clone(),
         })
+    }
+
+    fn normalized(self) -> Self {
+        match self {
+            MichelsonV1Expression::Prim(prim) => MichelsonV1Expression::Prim(prim.normalized()),
+            _ => self,
+        }
     }
 
     fn prepack_sequence(
@@ -227,29 +235,43 @@ impl MichelsonV1Expression {
     ) -> Result<MichelsonV1Expression, TzError> {
         use primitive::Data;
 
-        if let MichelsonV1Expression::Prim(value) = self {
-            let pair_types = args.ok_or(TzError::InvalidType)?;
+        match self {
+            MichelsonV1Expression::Prim(value) => {
+                let pair_types = args.ok_or(TzError::InvalidType)?;
 
-            if value.prim != Primitive::Data(Data::Pair) || value.args_count() != pair_types.len() {
-                return Err(TzError::InvalidType);
+                let value = value.clone().normalized();
+
+                if value.prim != Primitive::Data(Data::Pair)
+                    || value.args_count() != pair_types.len()
+                {
+                    return Err(TzError::InvalidType);
+                }
+
+                let arguments: Option<Vec<MichelsonV1Expression>> = value
+                    .args
+                    .as_ref()
+                    .and_then(|args| {
+                        Some(
+                            args.iter()
+                                .enumerate()
+                                .map(|(index, argument)| argument.prepack(&pair_types[index]))
+                                .collect::<Result<Vec<MichelsonV1Expression>, TzError>>(),
+                        )
+                    })
+                    .map_or(Ok(None), |r| r.map(Some))?;
+
+                Ok(data::prim(Data::Pair, arguments))
             }
-
-            let arguments: Option<Vec<MichelsonV1Expression>> = value
-                .args
-                .as_ref()
-                .and_then(|args| {
-                    Some(
-                        args.iter()
-                            .enumerate()
-                            .map(|(index, argument)| argument.prepack(&pair_types[index]))
-                            .collect::<Result<Vec<MichelsonV1Expression>, TzError>>(),
-                    )
-                })
-                .map_or(Ok(None), |r| r.map(Some))?;
-
-            Ok(data::prim(Data::Pair, arguments))
-        } else {
-            Err(TzError::InvalidType)
+            MichelsonV1Expression::Sequence(values) => {
+                let pair = MichelsonV1Expression::Prim(prim::Prim::new(
+                    primitive::Primitive::Data(Data::Pair),
+                    Some(values.clone()),
+                    None,
+                ))
+                .normalized();
+                pair.prepack_pair(args)
+            }
+            MichelsonV1Expression::Literal(_) => Err(TzError::InvalidType),
         }
     }
 
@@ -357,13 +379,13 @@ impl MichelsonV1Expression {
     //     todo!()
     // }
 
-    fn type_info(
-        &self,
+    fn type_info<'a>(
+        &'a self,
     ) -> Result<
         (
             primitive::Type,
-            Option<&Vec<MichelsonV1Expression>>,
-            Option<&Vec<String>>,
+            Option<&'a Vec<MichelsonV1Expression>>,
+            Option<&'a Vec<String>>,
         ),
         TzError,
     > {
@@ -513,6 +535,14 @@ pub fn extract_int(value: &MichelsonV1Expression) -> Result<&BigInt, TzError> {
 
 pub fn extract_string(value: &MichelsonV1Expression) -> Result<&String, TzError> {
     if let MichelsonV1Expression::Literal(literal::Literal::String(value)) = value {
+        Ok(value)
+    } else {
+        Err(TzError::InvalidType)
+    }
+}
+
+pub fn extract_bytes(value: &MichelsonV1Expression) -> Result<&Vec<u8>, TzError> {
+    if let MichelsonV1Expression::Literal(literal::Literal::Bytes(value)) = value {
         Ok(value)
     } else {
         Err(TzError::InvalidType)
