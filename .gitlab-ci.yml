@@ -4,6 +4,8 @@ variables:
   GOOGLE_TAG: eu.gcr.io/papers-kubernetes/tz-wrapped-backend:$CI_COMMIT_SHA
   TEST_TAG: tz_wrapped_backend_test_$CI_COMMIT_SHA
   GOOGLE_TAG_LATEST: eu.gcr.io/papers-kubernetes/tz-wrapped-backend:latest
+  GOOGLE_TAG_DEV: eu.gcr.io/papers-dev-kubernetes/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHA
+  GOOGLE_TAG_LATEST_DEV: eu.gcr.io/papers-dev-kubernetes/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
 
 stages:
   - build
@@ -41,7 +43,28 @@ build_serve:
   tags:
     - docker
 
-publish:
+publish-dev:
+  stage: publish
+  image: google/cloud-sdk
+  before_script:
+    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT_DEV
+    - gcloud config set project $GCLOUD_PROJECT_DEV
+    - gcloud config set compute/zone $GCLOUD_ZONE
+    - gcloud auth configure-docker
+  script:
+    - docker tag $GOOGLE_TAG $GOOGLE_TAG_DEV
+    - docker tag $GOOGLE_TAG $GOOGLE_TAG_LATEST_DEV
+    - docker push $GOOGLE_TAG_DEV
+    - docker push $GOOGLE_TAG_LATEST_DEV
+  only:
+    - master
+    - develop
+  tags:
+    - docker
+
+publish-prod:
   stage: publish
   image: google/cloud-sdk
   before_script:
@@ -57,23 +80,23 @@ publish:
     - docker push $GOOGLE_TAG_LATEST
   only:
     - master
-    - develop
   tags:
     - docker
 
 k8s-deploy-development:
   stage: deploy
+  needs: ["publish-dev"]
   when: manual
   image: google/cloud-sdk
   before_script:
-    - echo $GCLOUD_GOOGLE_KEY > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT
-    - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set compute/zone $GCLOUD_ZONE_DEVELOPMENT
+    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT_DEV
+    - gcloud config set project $GCLOUD_PROJECT_DEV
+    - gcloud config set compute/zone $GCLOUD_ZONE
     - gcloud container clusters get-credentials papers-cluster-development
   script:
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__TO_BE_REPLACED_BY_IMAGE_TAG__|"$GOOGLE_TAG"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__TO_BE_REPLACED_BY_IMAGE_TAG__|"$GOOGLE_TAG_DEV"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_USER__|"$DB_USER_DEVELOPMENT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_PASSWORD__|"$DB_PASSWORD_DEVELOPMENT"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_DEVELOPMENT__|"$DB_NAME_DEVELOPMENT"|g" {} +
@@ -81,6 +104,7 @@ k8s-deploy-development:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DOMAIN_NAME_DEVELOPMENT__|"$DOMAIN_NAME_DEVELOPMENT"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/development/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
@@ -92,6 +116,7 @@ k8s-deploy-development:
 
 k8s-deploy-production:
   stage: deploy
+  needs: ["publish-prod"]
   when: manual
   image: google/cloud-sdk
   before_script:
@@ -110,6 +135,7 @@ k8s-deploy-production:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DOMAIN_NAME_PRODUCTION__|"$DOMAIN_NAME_PRODUCTION"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/production/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
@@ -126,18 +152,18 @@ provision-db-development:
   when: manual
   image: google/cloud-sdk
   before_script:
-    - echo $GCLOUD_GOOGLE_KEY > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT
-    - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set compute/zone $GCLOUD_ZONE_DEVELOPMENT
+    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT_DEV
+    - gcloud config set project $GCLOUD_PROJECT_DEV
+    - gcloud config set compute/zone $GCLOUD_ZONE
     - gcloud container clusters get-credentials papers-cluster-development
-    - export STOLON_PROXY=$(kubectl get pods --all-namespaces | grep stolon-proxy | awk 'NR==1{print $2}')
+    - export STOLON_PROXY=$(kubectl get pods --namespace postgres | grep postgres | awk 'NR==1{print $1}')
   script:
-    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE DATABASE $DB_NAME_DEVELOPMENT\""  || true
-    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE USER $DB_USER_DEVELOPMENT WITH ENCRYPTED PASSWORD '$DB_PASSWORD_DEVELOPMENT'\"" || true
-    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $DB_NAME_DEVELOPMENT to $DB_USER_DEVELOPMENT\"" || true
-    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME --dbname=$DB_NAME_DEVELOPMENT postgres -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"'" || true
+    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE DATABASE $DB_NAME_DEVELOPMENT\""  || true
+    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE USER $DB_USER_DEVELOPMENT WITH ENCRYPTED PASSWORD '$DB_PASSWORD_DEVELOPMENT'\"" || true
+    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $DB_NAME_DEVELOPMENT to $DB_USER_DEVELOPMENT\"" || true
+    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME --dbname=$DB_NAME_DEVELOPMENT postgres -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"'" || true
   tags:
     - docker
 
@@ -171,15 +197,15 @@ drop-db-development:
   when: manual
   image: google/cloud-sdk
   before_script:
-    - echo $GCLOUD_GOOGLE_KEY > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT
-    - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set compute/zone $GCLOUD_ZONE_DEVELOPMENT
+    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
+    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
+    - gcloud config set account $GCLOUD_ACCOUNT_DEV
+    - gcloud config set project $GCLOUD_PROJECT_DEV
+    - gcloud config set compute/zone $GCLOUD_ZONE
     - gcloud container clusters get-credentials papers-cluster-development
-    - export STOLON_PROXY=$(kubectl get pods --all-namespaces | grep stolon-proxy | awk 'NR==1{print $2}')
+    - export STOLON_PROXY=$(kubectl get pods --namespace postgres | grep postgres | awk 'NR==1{print $1}')
   script:
-    - kubectl exec -n development-postgresql $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"DROP DATABASE $DB_NAME_DEVELOPMENT\""  || true
+    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"DROP DATABASE $DB_NAME_DEVELOPMENT\""  || true
   tags:
     - docker
 

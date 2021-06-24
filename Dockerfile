@@ -1,10 +1,11 @@
-FROM rust:1.47.0 as build
+FROM rust:1.52.1 as build
 ENV PKG_CONFIG_ALLOW_CROSS=1
 
 WORKDIR /usr/src/tz-wrapped-backend
 
 RUN USER=root cargo init
 COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.lock ./Cargo.lock
 RUN cargo build --release
 RUN rm src/*.rs
 

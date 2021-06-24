@@ -54,21 +54,3 @@ public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
 
 [[contracts.gatekeepers]]
 public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
-
-# [[contracts]]
-# address = "KT1CzBckMYTXnY4tdZqoGpjxpyaiU7EwxW2J"
-# multisig = "KT1E8ZCP3NuL5TTnqkZL5oK9nMqSKrob4MWQ"
-# name = "tzETH"
-# kind = "fa2"
-# token_id = 0
-# symbol = "tzETH"
-# decimals = 18
-
-# [[contracts.gatekeepers]]
-# public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
-
-# [[contracts.gatekeepers]]
-# public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
-
-# [[contracts.gatekeepers]]
-# public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"

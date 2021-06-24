@@ -422,11 +422,3 @@ impl NewOperationRequest {
         Ok(())
     }
 }
-
-#[derive(AsChangeset, Identifiable, Debug)]
-#[table_name = "operation_requests"]
-pub struct UpdateOperation {
-    pub id: Uuid,
-    pub operation_hash: String,
-    pub state: i16,
-}
