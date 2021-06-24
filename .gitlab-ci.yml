@@ -45,7 +45,7 @@ build_serve:
 
 publish-dev:
   stage: publish
-  image: google/cloud-sdk  
+  image: google/cloud-sdk
   before_script:
     - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
     - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
@@ -104,6 +104,7 @@ k8s-deploy-development:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DOMAIN_NAME_DEVELOPMENT__|"$DOMAIN_NAME_DEVELOPMENT"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/development/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
@@ -134,6 +135,7 @@ k8s-deploy-production:
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
     - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
+    - find k8s -type f -name \*.yaml -exec sed -i "s|__DOMAIN_NAME_PRODUCTION__|"$DOMAIN_NAME_PRODUCTION"|g" {} +
     - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
     - kubectl apply -f k8s/tz-wrapped/production/ --recursive
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
