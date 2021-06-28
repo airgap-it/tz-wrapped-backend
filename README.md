@@ -2,6 +2,8 @@
 
 The backend component of the tz-wrapped application.
 
+The frontend can be found [here](https://github.com/airgap-it/tz-wrapped-frontend).
+
 ## Dependencies
 
 This project is written in Rust. It uses the [actix-web](https://github.com/actix/actix-web) web framework and [Diesel](https://github.com/diesel-rs/diesel) as the ORM.
