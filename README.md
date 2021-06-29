@@ -36,7 +36,7 @@ Build the docker image with `docker build -t tz-wrapped-backend:latest .`.
 
 Make sure the postgres service is running and the database is setup as described in the previous section.
 
-Run the built docker image with `docker compose up -d tz-wrapped-backend`.
+Run the built docker image with `docker-compose up -d tz-wrapped-backend`.
 
 The docker container will listen on port 8080, to change that, edit the `docker-compose.yml` file.
 
@@ -60,8 +60,8 @@ inactivity_timeout_seconds = 1800
 ```
 
 - **address**: the local address to bind the server to, to listen for incoming requests.
-- **domain\_name**: the server domain name, this is used to configure CORS and cookies.
-- **inactivity\_timeout\_seconds**: the inactivity timeout in seconds for the logged in user.
+- **domain_name**: the server domain name, this is used to configure CORS and cookies.
+- **inactivity_timeout_seconds**: the inactivity timeout in seconds for the logged in user.
 
 ### Database
 
