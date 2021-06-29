@@ -22,10 +22,6 @@ Run `cargo build` to build the project.
 
 Run `cargo test` to execute the unit tests.
 
-## Docker
-
-Run `docker build .` to build the docker image.
-
 ## Run the server locally
 
 1. Start the postgres database service by running `docker-compose up -d postgres`
@@ -33,6 +29,16 @@ Run `docker build .` to build the docker image.
 3. To send email notifications, the server needs to be able to connect to an SMTP service. The service can be configured in the `config/Default.toml` configuration file.
 4. For the local deployment, the contracts to use is configured in the `config/Local.toml` configuration file. See the Configuration section for more information.
 5. Run `cargo run`
+
+## Docker
+
+Build the docker image with `docker build -t tz-wrapped-backend:latest .`.
+
+Make sure the postgres service is running and the database is setup as described in the previous section.
+
+Run the built docker image with `docker compose up -d tz-wrapped-backend`.
+
+The docker container will listen on port 8080, to change that, edit the `docker-compose.yml` file.
 
 ## Configuration
 
@@ -42,6 +48,36 @@ For a local deployment, both the `config/Default.toml` and the `config/Local.tom
 
 You can force the server to load different configurations with the `RUN_ENV` environment variable. Valid values are: `Local`, `Development`, `Production`. The corresponding toml config file will be used.
 
+### Server
+
+Server configuration:
+
+```
+[server]
+address = "0.0.0.0:80"
+domain_name = "localhost"
+inactivity_timeout_seconds = 1800
+```
+
+- **address**: the local address to bind the server to, to listen for incoming requests.
+- **domain\_name**: the server domain name, this is used to configure CORS and cookies.
+- **inactivity\_timeout\_seconds**: the inactivity timeout in seconds for the logged in user.
+
+### Database
+
+The postgres database configuration:
+
+```
+[database]
+host = "postgres"
+port = "5432"
+user = "user"
+password = "password"
+name = "tz-wrapped"
+```
+
+### Tezos
+
 In the configuration files, it is possible to specify the node URL to use:
 
 ```
@@ -49,7 +85,9 @@ In the configuration files, it is possible to specify the node URL to use:
 node_url = "https://edonet.smartpy.io"
 ```
 
-The contract and its multisig contract addresses and other informations like the name, symbol, etc.:
+### Contracts
+
+The contract and its multisig contract address and other informations like the name, symbol, etc.:
 
 ```
 [[contracts]] # Contract config for tzBTC Owner
