@@ -59,7 +59,6 @@ publish-dev:
     - docker push $GOOGLE_TAG_DEV
     - docker push $GOOGLE_TAG_LATEST_DEV
   only:
-    - master
     - develop
   tags:
     - docker
@@ -110,7 +109,6 @@ k8s-deploy-development:
     - kubectl apply -f k8s/tz-wrapped/common/ --recursive
   only:
     - develop
-    - master
   tags:
     - docker
 
