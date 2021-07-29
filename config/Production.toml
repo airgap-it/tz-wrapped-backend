@@ -36,3 +36,9 @@ operation_request_kind = "update_keyholders"
 
 [[contracts.gatekeepers]]
 public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuRZepzeDzSsJEHTSPc5CkWySwai4LTYn7EaFbjmvx6xnwafTKJ"
+
+[[contracts.gatekeepers]]
+public_key = "edpkv8vx9bkSY24EEV2LsfW3ZKavoma5CcvdQCqg6UUokPqxsPQ6BZ"
