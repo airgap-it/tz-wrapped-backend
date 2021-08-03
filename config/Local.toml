@@ -1,5 +1,6 @@
 [server]
 domain_name = "localhost"
+address = "0.0.0.0:8080"
 
 [tezos]
 node_url = "https://edonet.smartpy.io"
@@ -9,11 +10,11 @@ host = "localhost"
 
 # Contract config for tzBTC Owner
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE" # address of the contract
+address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"  # address of the contract
 multisig = "KT1KiJ1N9wgEVGkgPDYhLBYRBMPy1RG3pN2J" # address of the multisig contract used to interact with the contract
-name = "tzBTC - Owner" # The name displayed in the frontend dropdown menu
-kind = "fa1" # this can either be fa1 or fa2
-token_id = 0 # this value is not important if the kind value is fa1
+name = "tzBTC - Owner"                            # The name displayed in the frontend dropdown menu
+kind = "fa1"                                      # this can either be fa1 or fa2
+token_id = 0                                      # this value is not important if the kind value is fa1
 symbol = "tzBTC"
 decimals = 8
 
@@ -57,3 +58,6 @@ public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
 
 [[contracts.gatekeepers]]
 public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
+
+[[contracts.gatekeepers]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"

@@ -327,7 +327,8 @@ const NET: EncodingInfo = EncodingInfo {
     versioned_prefix: &[87, 82, 0],
     bytes_length: 4,
 };
-const B: EncodingInfo = EncodingInfo {
+
+pub const B: EncodingInfo = EncodingInfo {
     prefix: EncodingPrefix::B,
     versioned_prefix: &[1, 52],
     bytes_length: 32,

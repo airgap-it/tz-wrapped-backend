@@ -1,6 +1,6 @@
 pub mod coding;
-pub mod multisig;
 pub mod micheline;
+pub mod multisig;
 pub mod utils;
 
 use base58check::{FromBase58Check, ToBase58Check};
