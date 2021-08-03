@@ -46,9 +46,12 @@ pub async fn sign_in(
     }
 
     let user = users.first().unwrap();
-    let challenge_bytes = authentication_challenge.challenge.as_bytes();
+    let challenge_bytes =
+        hex::decode(authentication_challenge.challenge).map_err(|_error| APIError::Internal {
+            description: "failed to decode challenge".into(),
+        })?;
     let hashed =
-        crypto::generic_hash(challenge_bytes, 32).map_err(|_error| APIError::Internal {
+        crypto::generic_hash(&challenge_bytes, 32).map_err(|_error| APIError::Internal {
             description: "failed to hash challenge".into(),
         })?;
     let verified = user.verify_message(&hashed, &body.signature)?;

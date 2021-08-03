@@ -573,11 +573,11 @@ pub fn extract_sequence(
     }
 }
 
-trait HexEncodable {
+pub trait HexEncodable {
     fn to_hex_encoded(&self) -> Result<String, TzError>;
 }
 
-trait HexDecodable {
+pub trait HexDecodable {
     fn from_hex(encoded: &mut ConsumableHexStr) -> Result<Self, TzError>
     where
         Self: Sized;

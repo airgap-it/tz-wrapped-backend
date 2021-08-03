@@ -1,5 +1,5 @@
 [server]
-address = "0.0.0.0:80"
+address = "0.0.0.0:8080"
 inactivity_timeout_seconds = 1800
 
 [database]

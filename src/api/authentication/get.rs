@@ -12,6 +12,11 @@ use crate::{
     db::models::contract::Contract,
     db::models::user::User,
     db::sync_keyholders,
+    tezos::{
+        coding,
+        micheline::{self, HexEncodable},
+        TzError,
+    },
     DbPool,
 };
 use crate::{
@@ -71,14 +76,23 @@ pub async fn sign_in(
     }
 
     let address = query.address.clone();
-    let new_authentication_challenge = NewAuthenticationChallenge {
-        address,
-        challenge: format!(
-            "sign-in-challenge:{};{};{}",
+    let branch = block_hash(&tezos_settings.node_url).await?;
+    let forged_branch = hex::encode(coding::encode(&branch, coding::B, None)?);
+    let content = micheline::bytes(
+        format!(
+            "Tezos Signed Message: {} {} {}",
             server_settings.domain_name,
             chrono::Utc::now(),
             bs58::encode(crypto::generate_random_bytes(10)).into_string()
-        ),
+        )
+        .as_bytes()
+        .to_vec(),
+    )
+    .to_hex_encoded()?
+    .split_off(2);
+    let new_authentication_challenge = NewAuthenticationChallenge {
+        address,
+        challenge: format!("03{}11{}", forged_branch, content),
     };
 
     let conn = pool.get()?;
@@ -107,4 +121,17 @@ pub async fn me(
             .await?;
 
     Ok(HttpResponse::Ok().json(AuthUser::from(user, current_user)))
+}
+
+async fn block_hash(node_url: &str) -> Result<String, APIError> {
+    let url = format!("{}/chains/main/blocks/head/hash", node_url);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|_error| TzError::NetworkFailure)?
+        .json::<String>()
+        .await
+        .map_err(|_error| TzError::ParsingFailure)?;
+
+    Ok(response)
 }
