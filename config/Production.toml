@@ -42,3 +42,6 @@ public_key = "edpkuRZepzeDzSsJEHTSPc5CkWySwai4LTYn7EaFbjmvx6xnwafTKJ"
 
 [[contracts.gatekeepers]]
 public_key = "edpkv8vx9bkSY24EEV2LsfW3ZKavoma5CcvdQCqg6UUokPqxsPQ6BZ"
+
+[[contracts.gatekeepers]]
+public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
