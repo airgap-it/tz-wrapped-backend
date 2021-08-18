@@ -3,7 +3,7 @@ domain_name = "localhost"
 address = "0.0.0.0:8080"
 
 [tezos]
-node_url = "https://edonet.smartpy.io"
+node_url = "https://tezos-edonet-node.prod.gke.papers.tech"
 
 [database]
 host = "localhost"
