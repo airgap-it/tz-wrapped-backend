@@ -1,5 +1,5 @@
 [tezos]
-node_url = "https://mainnet-tezos.giganode.io"
+node_url = "https://tezos-node.prod.gke.papers.tech"
 
 [[contracts]]
 address = "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
