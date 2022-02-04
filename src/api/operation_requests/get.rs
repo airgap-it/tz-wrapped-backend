@@ -10,8 +10,8 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::tezos::multisig;
 use crate::tezos::multisig::Signature;
+use crate::tezos::multisig::{self, OperationRequestParams};
 use crate::DbPool;
 use crate::{
     api::models::user::UserKind,
@@ -185,8 +185,18 @@ pub async fn signable_message(
         tezos_settings.node_url.as_ref(),
     );
 
+    let operation_request_params = OperationRequestParams::from(operation_request);
+    let keyholder_public_keys = match proposed_keyholders {
+        None => None,
+        Some(keyholders) => Some(
+            keyholders
+                .into_iter()
+                .map(|keyholder| keyholder.public_key)
+                .collect(),
+        ),
+    };
     let signable_message = multisig
-        .signable_message(&contract, &operation_request, proposed_keyholders)
+        .signable_message(&contract, &operation_request_params, keyholder_public_keys)
         .await?;
 
     let signable_message_info: SignableMessageInfo = signable_message.try_into()?;
@@ -234,11 +244,21 @@ pub async fn operation_request_parameters(
             public_key: user.public_key.as_ref(),
         })
         .collect::<Vec<Signature>>();
+    let operation_request_params = OperationRequestParams::from(operation_request);
+    let keyholder_public_keys = match proposed_keyholders {
+        None => None,
+        Some(keyholders) => Some(
+            keyholders
+                .into_iter()
+                .map(|keyholder| keyholder.public_key)
+                .collect(),
+        ),
+    };
     let parameters = multisig
         .transaction_parameters(
             &contract,
-            &operation_request,
-            proposed_keyholders,
+            &operation_request_params,
+            keyholder_public_keys,
             signatures,
         )
         .await?;
