@@ -12,7 +12,7 @@ use crate::db::models::{
 };
 use crate::notifications::{notify_approval_received, notify_min_approvals_received};
 use crate::settings;
-use crate::tezos::multisig;
+use crate::tezos::multisig::{self, OperationRequestParams};
 use crate::DbPool;
 use crate::{api::models::user::UserKind, auth::get_current_user};
 use crate::{
@@ -44,8 +44,18 @@ pub async fn operation_approval(
         tezos_settings.node_url.as_ref(),
     );
 
+    let operation_request_params = OperationRequestParams::from(operation_request.clone());
+    let keyholder_public_keys = match proposed_keyholders {
+        None => None,
+        Some(keyholders) => Some(
+            keyholders
+                .into_iter()
+                .map(|keyholder| keyholder.public_key)
+                .collect(),
+        ),
+    };
     let signable_message = multisig
-        .signable_message(&contract, &operation_request, proposed_keyholders)
+        .signable_message(&contract, &operation_request_params, keyholder_public_keys)
         .await?;
 
     let min_approvals = multisig.min_signatures().await?;

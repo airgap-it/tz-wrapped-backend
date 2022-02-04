@@ -86,6 +86,7 @@ pub struct NewOperationRequest {
     pub threshold: Option<i64>,
     pub proposed_keyholders: Option<Vec<String>>,
     pub kind: OperationRequestKind,
+    pub ledger_hash: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
