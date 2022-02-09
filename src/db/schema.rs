@@ -36,6 +36,18 @@ table! {
 }
 
 table! {
+    node_endpoints (id) {
+        id -> Uuid,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+        name -> Varchar,
+        url -> Varchar,
+        network -> Varchar,
+        selected -> Bool,
+    }
+}
+
+table! {
     operation_approvals (id) {
         id -> Uuid,
         created_at -> Timestamp,
@@ -102,6 +114,7 @@ allow_tables_to_appear_in_same_query!(
     authentication_challenges,
     capabilities,
     contracts,
+    node_endpoints,
     operation_approvals,
     operation_requests,
     proposed_users,

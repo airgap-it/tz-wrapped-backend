@@ -71,10 +71,12 @@ impl TryFrom<DBUser> for User {
 pub enum UserKind {
     Gatekeeper = 0,
     Keyholder = 1,
+    Admin = 2,
 }
 
 const GATEKEEPER: &'static str = "gatekeeper";
 const KEYHOLDER: &'static str = "keyholder";
+const ADMIN: &'static str = "admin";
 
 impl TryFrom<&str> for UserKind {
     type Error = APIError;
@@ -83,6 +85,7 @@ impl TryFrom<&str> for UserKind {
         match value {
             GATEKEEPER => Ok(UserKind::Gatekeeper),
             KEYHOLDER => Ok(UserKind::Keyholder),
+            ADMIN => Ok(UserKind::Admin),
             _ => Err(APIError::InvalidValue {
                 description: format!("user kind cannot be {}", value),
             }),
@@ -97,6 +100,7 @@ impl TryFrom<i16> for UserKind {
         match value {
             0 => Ok(UserKind::Gatekeeper),
             1 => Ok(UserKind::Keyholder),
+            2 => Ok(UserKind::Admin),
             _ => Err(APIError::InvalidValue {
                 description: format!("user kind cannot be {}", value),
             }),
@@ -109,6 +113,7 @@ impl Into<&'static str> for UserKind {
         match self {
             UserKind::Gatekeeper => GATEKEEPER,
             UserKind::Keyholder => KEYHOLDER,
+            UserKind::Admin => ADMIN,
         }
     }
 }
@@ -118,6 +123,7 @@ impl Into<i64> for UserKind {
         match self {
             UserKind::Gatekeeper => 0,
             UserKind::Keyholder => 1,
+            UserKind::Admin => 2,
         }
     }
 }
@@ -127,6 +133,7 @@ impl Into<i16> for UserKind {
         match self {
             UserKind::Gatekeeper => 0,
             UserKind::Keyholder => 1,
+            UserKind::Admin => 2,
         }
     }
 }

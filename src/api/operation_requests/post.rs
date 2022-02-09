@@ -4,8 +4,10 @@ use actix_session::Session;
 use actix_web::{web, HttpResponse};
 use bigdecimal::BigDecimal;
 use diesel::Connection;
+use log::info;
 use num_bigint::BigInt;
 
+use crate::db::models::node_endpoint::NodeEndpoint;
 use crate::tezos::multisig::{self, OperationRequestParams, SignableMessage};
 use crate::DbPool;
 use crate::{
@@ -32,7 +34,6 @@ use crate::{settings, tezos, tezos::coding::validate_edpk};
 
 pub async fn operation_request(
     pool: web::Data<DbPool>,
-    tezos_settings: web::Data<settings::Tezos>,
     new_operation_request: web::Json<NewOperationRequest>,
     server_settings: web::Data<settings::Server>,
     session: Session,
@@ -67,14 +68,19 @@ pub async fn operation_request(
     })
     .await?;
 
+    let conn = pool.get()?;
+    let node_url =
+        web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
+
+    let node_url = &node_url;
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
         contract.kind.try_into()?,
-        tezos_settings.node_url.as_ref(),
+        node_url,
     );
 
     let nonce = std::cmp::max(multisig.nonce().await?, max_local_nonce + 1);
-    let chain_id = tezos::chain_id(tezos_settings.node_url.as_ref()).await?;
+    let chain_id = tezos::chain_id(node_url).await?;
 
     let amount = new_operation_request
         .amount
@@ -216,6 +222,7 @@ pub async fn operation_request(
     })
     .await?;
 
+    info!("Operation request created: {:?}", db_operation_request);
     let operation_request = OperationRequest::from(
         db_operation_request,
         gatekeeper,

@@ -10,6 +10,7 @@ pub struct Server {
     pub address: String,
     pub domain_name: String,
     pub inactivity_timeout_seconds: i64,
+    pub admins: Option<Vec<User>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -30,8 +31,10 @@ pub struct SMTP {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Tezos {
-    pub node_url: String,
+pub struct TezosNode {
+    pub name: String,
+    pub url: String,
+    pub network: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -41,8 +44,7 @@ pub struct Contract {
     pub name: String,
     pub kind: ContractKind,
     pub token_id: i64,
-    pub gatekeepers: Vec<Gatekeeper>,
-    pub keyholders: Option<Vec<Keyholder>>,
+    pub gatekeepers: Vec<User>,
     pub capabilities: Vec<Capability>,
     pub symbol: String,
     pub decimals: i32,
@@ -54,14 +56,7 @@ pub struct Capability {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Gatekeeper {
-    pub public_key: String,
-    pub name: Option<String>,
-    pub email: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct Keyholder {
+pub struct User {
     pub public_key: String,
     pub name: Option<String>,
     pub email: Option<String>,
@@ -72,7 +67,7 @@ pub struct Settings {
     pub server: Server,
     pub database: Database,
     pub smtp: SMTP,
-    pub tezos: Tezos,
+    pub tezos_nodes: Vec<TezosNode>,
     pub contracts: Vec<Contract>,
     pub env: ENV,
 }
@@ -115,7 +110,7 @@ impl Settings {
         let env = std::env::var("RUN_ENV").unwrap_or_else(|_| "Local".into());
         let mut s = Config::new();
         s.set("env", env.clone())?;
-        println!("RUN ENV: {}", env);
+        log::info!("RUN ENV: {}", env);
         s.merge(File::with_name(CONFIG_FILE_PATH))?;
         s.merge(File::with_name(&format!("{}{}", CONFIG_FILE_PREFIX, env)))?;
 

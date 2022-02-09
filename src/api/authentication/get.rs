@@ -9,8 +9,8 @@ use serde::Deserialize;
 use crate::{
     api::models::user::{AuthUser, UserState},
     auth::get_current_user,
-    db::models::contract::Contract,
     db::models::user::User,
+    db::models::{contract::Contract, node_endpoint::NodeEndpoint},
     db::sync_keyholders,
     tezos::{
         coding,
@@ -38,8 +38,6 @@ pub async fn sign_in(
     pool: web::Data<DbPool>,
     query: Query<Info>,
     server_settings: web::Data<settings::Server>,
-    contract_settings: web::Data<Vec<settings::Contract>>,
-    tezos_settings: web::Data<settings::Tezos>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
     if is_authenticated(&session) {
@@ -47,15 +45,15 @@ pub async fn sign_in(
     }
 
     let conn = pool.get()?;
-    let contracts = web::block(move || Contract::get_all(&conn)).await?;
-
-    sync_keyholders(
-        &pool,
-        contracts,
-        &tezos_settings.node_url,
-        &contract_settings,
-    )
+    let (contracts, node_url) = web::block::<_, _, APIError>(move || {
+        Ok((
+            Contract::get_all(&conn)?,
+            NodeEndpoint::get_selected(&conn)?.url,
+        ))
+    })
     .await?;
+
+    sync_keyholders(&pool, contracts, &node_url).await?;
 
     let address = query.address.clone();
     let conn = pool.get()?;
@@ -76,7 +74,7 @@ pub async fn sign_in(
     }
 
     let address = query.address.clone();
-    let branch = block_hash(&tezos_settings.node_url).await?;
+    let branch = block_hash(&node_url).await?;
     let forged_branch = hex::encode(coding::encode(&branch, coding::B, None)?);
     let content = micheline::bytes(
         format!(

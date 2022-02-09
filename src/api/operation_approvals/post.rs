@@ -2,9 +2,11 @@ use std::convert::TryInto;
 
 use actix_session::Session;
 use actix_web::{web, HttpResponse};
+use log::info;
 use multisig::SignableMessage;
 use uuid::Uuid;
 
+use crate::db::models::node_endpoint::NodeEndpoint;
 use crate::db::models::{
     contract::Contract, operation_approval::NewOperationApproval as DBNewOperationApproval,
     operation_approval::OperationApproval as DBOperationApproval,
@@ -25,8 +27,6 @@ use crate::{
 
 pub async fn operation_approval(
     pool: web::Data<DbPool>,
-    tezos_settings: web::Data<settings::Tezos>,
-    contract_settings: web::Data<Vec<settings::Contract>>,
     server_settings: web::Data<settings::Server>,
     body: web::Json<NewOperationApproval>,
     session: Session,
@@ -37,11 +37,13 @@ pub async fn operation_approval(
         get_operation_request_and_contract(&pool, body.operation_request_id).await?;
 
     current_user.require_roles(vec![UserKind::Keyholder], contract.id)?;
-
+    let conn = pool.get()?;
+    let node_url =
+        web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
         contract.kind.try_into()?,
-        tezos_settings.node_url.as_ref(),
+        &node_url,
     );
 
     let operation_request_params = OperationRequestParams::from(operation_request.clone());
@@ -60,17 +62,10 @@ pub async fn operation_approval(
 
     let min_approvals = multisig.min_signatures().await?;
 
-    crate::db::sync_keyholders(
-        &pool,
-        vec![contract.clone()],
-        &tezos_settings.node_url,
-        &contract_settings,
-    )
-    .await?;
+    crate::db::sync_keyholders(&pool, vec![contract.clone()], &node_url).await?;
 
     let keyholder =
-        find_and_validate_keyholder(&pool, current_user, &signable_message, &contract, &body)
-            .await?;
+        find_keyholder_and_validate_signature(&pool, &signable_message, &contract, &body).await?;
     let keyholder_id = keyholder.id;
     let inserted_approval = store_approval(&pool, keyholder_id, body.into_inner()).await?;
 
@@ -102,6 +97,10 @@ pub async fn operation_approval(
             Ok(())
         })
         .await?;
+        info!(
+            "Enough signatures collected for operation: {:?}",
+            request_id
+        );
     } else {
         let _ = web::block::<_, _, APIError>(move || {
             let user = User::get(&conn, operation_request.user_id)?;
@@ -129,7 +128,7 @@ async fn store_approval(
     operation_approval: NewOperationApproval,
 ) -> Result<DBOperationApproval, APIError> {
     let conn = pool.get()?;
-    Ok(web::block::<_, _, diesel::result::Error>(move || {
+    let operation_approval = web::block::<_, _, diesel::result::Error>(move || {
         let new_operation_approval = DBNewOperationApproval {
             keyholder_id,
             operation_request_id: operation_approval.operation_request_id,
@@ -138,7 +137,14 @@ async fn store_approval(
 
         DBOperationApproval::insert(&conn, new_operation_approval)
     })
-    .await?)
+    .await?;
+
+    info!(
+        "Uploaded signature for operation: {:?} from keyholder: {:?}",
+        operation_approval.operation_request_id, keyholder_id
+    );
+
+    Ok(operation_approval)
 }
 
 async fn find_and_validate_keyholder(
@@ -165,6 +171,42 @@ async fn find_and_validate_keyholder(
     if is_match {
         return Ok(keyholder);
     }
+    Err(APIError::InvalidSignature)
+}
+
+async fn find_keyholder_and_validate_signature(
+    pool: &web::Data<DbPool>,
+    message: &SignableMessage,
+    contract: &Contract,
+    operation_approval: &NewOperationApproval,
+) -> Result<User, APIError> {
+    let conn = pool.get()?;
+    let contract_id = contract.id.clone();
+
+    let keyholders = web::block::<_, _, APIError>(move || {
+        Ok(User::get_all_active(
+            &conn,
+            contract_id,
+            UserKind::Keyholder,
+        )?)
+    })
+    .await?;
+
+    let hashed = message.blake2b_hash()?;
+    let filtered_keyholders: Vec<User> = keyholders
+        .into_iter()
+        .filter(|keyholder| {
+            match keyholder.verify_message(&hashed, &operation_approval.signature) {
+                Ok(value) => value,
+                Err(_) => false,
+            }
+        })
+        .collect();
+
+    if filtered_keyholders.len() == 1 {
+        return Ok(filtered_keyholders[0].clone());
+    }
+
     Err(APIError::InvalidSignature)
 }
 
