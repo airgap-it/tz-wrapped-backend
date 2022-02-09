@@ -10,7 +10,6 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::DbPool;
 use crate::{
     api::models::{
         common::ListResponse,
@@ -22,6 +21,7 @@ use crate::{
 use crate::{
     db::models::contract::Contract, db::models::user::User as DBUser, db::sync_keyholders, settings,
 };
+use crate::{db::models::node_endpoint::NodeEndpoint, DbPool};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -37,8 +37,6 @@ pub async fn users(
     pool: web::Data<DbPool>,
     query: Query<Info>,
     server_settings: web::Data<settings::Server>,
-    contract_settings: web::Data<Vec<settings::Contract>>,
-    tezos_settings: web::Data<settings::Tezos>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
     let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
@@ -46,15 +44,15 @@ pub async fn users(
     current_user.require_roles(vec![UserKind::Gatekeeper, UserKind::Keyholder], contract_id)?;
 
     let conn = pool.get()?;
-    let contract = web::block(move || Contract::get(&conn, &contract_id)).await?;
-
-    sync_keyholders(
-        &pool,
-        vec![contract],
-        &tezos_settings.node_url,
-        &contract_settings,
-    )
+    let (contract, node_url) = web::block::<_, _, APIError>(move || {
+        Ok((
+            Contract::get(&conn, &contract_id)?,
+            NodeEndpoint::get_selected(&conn)?.url,
+        ))
+    })
     .await?;
+
+    sync_keyholders(&pool, vec![contract], &node_url).await?;
 
     let conn = pool.get()?;
 

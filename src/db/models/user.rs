@@ -284,16 +284,16 @@ impl User {
         }
 
         if !to_add.is_empty() {
-            let added = diesel::insert_into(users::dsl::users)
+            let added = diesel::insert_into(users::table)
                 .values(to_add)
                 .execute(conn)?;
 
-            changes += added
+            changes += added;
         }
 
         if !to_update.is_empty() {
             for update in to_update {
-                changes += diesel::update(users::dsl::users.find(update.id))
+                changes += diesel::update(users::table.find(update.id))
                     .set(update)
                     .execute(conn)?;
             }

@@ -21,14 +21,15 @@ extern crate native_tls;
 use api::models::{error::APIError, user::UserKind};
 use crypto::generate_random_bytes;
 use db::models::contract;
+use db::models::node_endpoint;
 use db::models::user;
 use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use diesel_migrations::embed_migrations;
 use dotenv::dotenv;
+use r2d2::PooledConnection;
 use settings::ENV;
 use user::SyncUser;
-// use std::env;
 
 mod api;
 mod auth;
@@ -39,6 +40,7 @@ mod settings;
 mod tezos;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
+type Conn = PooledConnection<ConnectionManager<PgConnection>>;
 
 embed_migrations!("./migrations");
 
@@ -63,7 +65,7 @@ async fn index() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info");
+    std::env::set_var("RUST_LOG", "info");
     env_logger::init();
 
     let database_url = database_url();
@@ -126,14 +128,14 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(index))
             .service(
                 web::scope("/api/v1")
-                    .data(CONFIG.tezos.clone())
                     .data(CONFIG.server.clone())
                     .data(CONFIG.contracts.clone())
                     .configure(api::contracts::api_config)
                     .configure(api::users::api_config)
                     .configure(api::operation_requests::api_config)
                     .configure(api::operation_approvals::api_config)
-                    .configure(api::authentication::api_config),
+                    .configure(api::authentication::api_config)
+                    .configure(api::nodes::api_config),
             )
     })
     .bind(&CONFIG.server.address)?
@@ -153,10 +155,12 @@ fn domain_suffix() -> &'static str {
 }
 
 async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
-    println!("syncing DB");
+    log::info!("syncing DB");
     let contracts = &CONFIG.contracts;
     let mut conn = pool.get()?;
-    contract::Contract::sync_contracts(pool, contracts, &CONFIG.tezos.node_url).await?;
+    node_endpoint::NodeEndpoint::sync(&conn, &CONFIG.tezos_nodes)?;
+    let node_url = node_endpoint::NodeEndpoint::get_selected(&conn)?.url;
+    contract::Contract::sync_contracts(pool, contracts, &node_url).await?;
     let stored_contracts =
         web::block::<_, _, APIError>(move || Ok(contract::Contract::get_all(&conn)?)).await?;
 
@@ -167,12 +171,27 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
                 && stored_contract.multisig_pkh == contract.multisig
                 && (stored_contract.token_id as i64) == contract.token_id
         });
-
         if let Some(stored_contract) = stored_contract {
             conn = pool.get()?;
             let stored_contract_id = stored_contract.id.clone();
             web::block::<_, _, APIError>(move || {
-                let _changes = user::User::sync_users(
+                if let Some(admins) = &CONFIG.server.admins {
+                    user::User::sync_users(
+                        &conn,
+                        stored_contract_id,
+                        UserKind::Admin,
+                        admins
+                            .into_iter()
+                            .map(|admin| SyncUser {
+                                public_key: admin.public_key.clone(),
+                                display_name: admin.name.clone().unwrap_or("".into()),
+                                email: admin.email.clone(),
+                            })
+                            .collect::<Vec<SyncUser>>()
+                            .as_ref(),
+                    )?;
+                }
+                user::User::sync_users(
                     &conn,
                     stored_contract_id,
                     UserKind::Gatekeeper,
@@ -193,14 +212,8 @@ async fn sync_db(pool: &DbPool) -> Result<(), APIError> {
         }
     }
 
-    db::sync_keyholders(
-        pool,
-        stored_contracts,
-        &CONFIG.tezos.node_url,
-        &CONFIG.contracts,
-    )
-    .await?;
+    db::sync_keyholders(pool, stored_contracts, &node_url).await?;
 
-    println!("syncing DB done");
+    log::info!("syncing DB done");
     Ok(())
 }

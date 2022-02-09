@@ -10,7 +10,6 @@ use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::tezos::multisig::Signature;
 use crate::tezos::multisig::{self, OperationRequestParams};
 use crate::DbPool;
 use crate::{
@@ -29,6 +28,7 @@ use crate::{
     auth::get_current_user,
 };
 use crate::{auth::SessionUser, settings};
+use crate::{db::models::node_endpoint::NodeEndpoint, tezos::multisig::Signature};
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -169,7 +169,6 @@ pub async fn operation_request(
 pub async fn signable_message(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
-    tezos_settings: web::Data<settings::Tezos>,
     server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
@@ -179,10 +178,14 @@ pub async fn signable_message(
     let (operation_request, contract, proposed_keyholders) =
         load_operation_and_contract(&pool, &id, current_user).await?;
 
+    let conn = pool.get()?;
+    let node_url =
+        web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
+
     let multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
         contract.kind.try_into()?,
-        tezos_settings.node_url.as_ref(),
+        &node_url,
     );
 
     let operation_request_params = OperationRequestParams::from(operation_request);
@@ -207,7 +210,6 @@ pub async fn signable_message(
 pub async fn operation_request_parameters(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
-    tezos_settings: web::Data<settings::Tezos>,
     server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
@@ -232,10 +234,14 @@ pub async fn operation_request_parameters(
         })
         .await?;
 
+    let conn = pool.get()?;
+    let node_url =
+        web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
+
     let mut multisig = multisig::get_multisig(
         contract.multisig_pkh.as_ref(),
         contract.kind.try_into()?,
-        tezos_settings.node_url.as_ref(),
+        &node_url,
     );
     let signatures = approvals
         .iter()

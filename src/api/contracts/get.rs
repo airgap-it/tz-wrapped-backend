@@ -1,18 +1,17 @@
 use std::convert::{TryFrom, TryInto};
 
-use actix_web::{web, web::Path, web::Query, HttpResponse};
-use diesel::{r2d2::ConnectionManager, r2d2::PooledConnection, PgConnection};
-use serde::Deserialize;
-use uuid::Uuid;
-
-use crate::settings;
-use crate::tezos::multisig;
+use crate::db::models::node_endpoint::NodeEndpoint;
+use crate::tezos::multisig::{self};
 use crate::DbPool;
 use crate::{
     api::models::{common::ListResponse, contract::Contract, error::APIError},
     db::models::contract::Contract as DBContract,
     db::models::operation_request::OperationRequest,
 };
+use crate::{settings, Conn};
+use actix_web::{web, web::Path, web::Query, HttpResponse};
+use serde::Deserialize;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct Info {
@@ -24,9 +23,11 @@ pub async fn contracts(
     pool: web::Data<DbPool>,
     query: Query<Info>,
     contract_settings: web::Data<Vec<settings::Contract>>,
-    tezos_settings: web::Data<settings::Tezos>,
 ) -> Result<HttpResponse, APIError> {
-    DBContract::sync_contracts(&pool, &contract_settings, &tezos_settings.node_url).await?;
+    let conn = pool.get()?;
+    let node_url =
+        web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
+    DBContract::sync_contracts(&pool, &contract_settings, &node_url).await?;
 
     let conn = pool.get()?;
 
@@ -38,11 +39,7 @@ pub async fn contracts(
     Ok(HttpResponse::Ok().json(result))
 }
 
-fn load_contracts(
-    conn: &PooledConnection<ConnectionManager<PgConnection>>,
-    page: i64,
-    limit: i64,
-) -> Result<ListResponse<Contract>, APIError> {
+fn load_contracts(conn: &Conn, page: i64, limit: i64) -> Result<ListResponse<Contract>, APIError> {
     let (contracts, total_pages) = DBContract::get_list(conn, page, limit)?;
     let contract_responses = contracts
         .into_iter()
@@ -77,11 +74,12 @@ pub async fn contract(
 pub async fn contract_nonce(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
-    tezos_settings: web::Data<settings::Tezos>,
 ) -> Result<HttpResponse, APIError> {
     let contract_id = path.id;
-    let multisig_nonce =
-        multisig_nonce(&pool, contract_id, tezos_settings.node_url.as_ref()).await?;
+    let conn = pool.get()?;
+    let node_url =
+        web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
+    let multisig_nonce = multisig_nonce(&pool, contract_id, &node_url).await?;
 
     Ok(HttpResponse::Ok().json(multisig_nonce))
 }
@@ -89,11 +87,12 @@ pub async fn contract_nonce(
 pub async fn next_usable_nonce(
     pool: web::Data<DbPool>,
     path: Path<PathInfo>,
-    tezos_settings: web::Data<settings::Tezos>,
 ) -> Result<HttpResponse, APIError> {
     let contract_id = path.id;
-    let multisig_nonce =
-        multisig_nonce(&pool, contract_id, tezos_settings.node_url.as_ref()).await?;
+    let conn = pool.get()?;
+    let node_url =
+        web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
+    let multisig_nonce = multisig_nonce(&pool, contract_id, &node_url).await?;
 
     let conn = pool.get()?;
     let max_local_nonce = web::block::<_, _, APIError>(move || {

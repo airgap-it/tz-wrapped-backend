@@ -45,6 +45,20 @@ impl SessionUser {
 
         Ok(())
     }
+
+    pub fn require_one_of_roles(&self, kinds: Vec<UserKind>) -> Result<(), APIError> {
+        let roles: Vec<&SessionUserRole> = self
+            .roles
+            .iter()
+            .filter(|role| kinds.contains(&role.kind))
+            .collect();
+
+        if roles.is_empty() {
+            return Err(APIError::Forbidden);
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
