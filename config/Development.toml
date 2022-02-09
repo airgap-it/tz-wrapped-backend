@@ -4,6 +4,7 @@ public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
 [[tezos_nodes]]
 name = "Papers"
 url = "https://tezos-hangzhounet-node.prod.gke.papers.tech"
+network = "hangzhounet"
 
 [[tezos_nodes]]
 name = "SmartPy"
