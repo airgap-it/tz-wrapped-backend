@@ -17,10 +17,10 @@ url = "https://tezos-hangzhou.cryptonomic-infra.tech"
 network = "hangzhounet"
 
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
+address = "KT1PCjoT2Z1oz1Vr5Nb1QHTTBYc1sLrbuoig"
 decimals = 8
 kind = "fa1"
-multisig = "KT1KiJ1N9wgEVGkgPDYhLBYRBMPy1RG3pN2J"
+multisig = "KT19LDmB7UV7q4vpvcnRrh3sHogFrXWwTXrt"
 name = "tzBTC - Owner"
 symbol = "tzBTC"
 token_id = 0
@@ -37,11 +37,14 @@ public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
 [[contracts.gatekeepers]]
 public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
+[[contracts.gatekeepers]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
+address = "KT1PCjoT2Z1oz1Vr5Nb1QHTTBYc1sLrbuoig"
 decimals = 8
 kind = "fa1"
-multisig = "KT1WHkRut4W4jCjarMG77brvjvD6WN96arYg"
+multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"
 name = "tzBTC - Operator"
 symbol = "tzBTC"
 token_id = 0
@@ -66,3 +69,6 @@ public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
 [[contracts.gatekeepers]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
+
+[[contracts.gatekeepers]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
