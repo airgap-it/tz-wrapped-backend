@@ -14,7 +14,7 @@ ADD . ./
 RUN rm ./target/release/deps/tz_wrapped_backend*
 RUN cargo install --path .
 
-FROM debian:buster-slim
+FROM debian:stable-slim
 
 RUN apt-get update \
     && apt-get install -y ca-certificates tzdata \
