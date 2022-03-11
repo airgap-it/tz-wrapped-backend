@@ -25,7 +25,7 @@ host = "localhost"
 
 # Contract config for tzBTC Owner
 [[contracts]]
-address = "KT1PCjoT2Z1oz1Vr5Nb1QHTTBYc1sLrbuoig" # address of the contract
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC" # address of the contract
 decimals = 8 
 kind = "fa1" # this can either be fa1 or fa2
 multisig = "KT19LDmB7UV7q4vpvcnRrh3sHogFrXWwTXrt" # address of the multisig contract used to interact with the contract
@@ -48,7 +48,7 @@ public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
 # Contract config for tzBTC Operator
 [[contracts]]
-address = "KT1PCjoT2Z1oz1Vr5Nb1QHTTBYc1sLrbuoig"
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
 decimals = 8
 kind = "fa1"
 multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"

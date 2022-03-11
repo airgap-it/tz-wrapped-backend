@@ -20,7 +20,7 @@ url = "https://tezos-hangzhou.cryptonomic-infra.tech"
 network = "hangzhounet"
 
 [[contracts]]
-address = "KT1PCjoT2Z1oz1Vr5Nb1QHTTBYc1sLrbuoig"
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
 decimals = 8
 kind = "fa1"
 multisig = "KT19LDmB7UV7q4vpvcnRrh3sHogFrXWwTXrt"
@@ -44,7 +44,7 @@ public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
 
 [[contracts]]
-address = "KT1PCjoT2Z1oz1Vr5Nb1QHTTBYc1sLrbuoig"
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
 decimals = 8
 kind = "fa1"
 multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"
