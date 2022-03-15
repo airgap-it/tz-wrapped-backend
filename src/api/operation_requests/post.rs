@@ -47,6 +47,10 @@ pub async fn operation_request(
         _ => UserKind::Gatekeeper,
     };
     current_user.require_roles(vec![required_user_kind], contract_id)?;
+    info!(
+        "New Operation Request received: {:?}",
+        new_operation_request
+    );
     let operation_request_kind: i16 = new_operation_request.kind.into();
     let (contract, max_local_nonce) = web::block::<_, _, APIError>(move || {
         let (contract, capabilities) = Contract::get_with_capabilities(&conn, &contract_id)?;
@@ -67,6 +71,8 @@ pub async fn operation_request(
         Ok((contract, max_nonce))
     })
     .await?;
+
+    info!("Operation Request for contract: {:?}", contract);
 
     let conn = pool.get()?;
     let node_url =
@@ -222,7 +228,8 @@ pub async fn operation_request(
     })
     .await?;
 
-    info!("Operation request created: {:?}", db_operation_request);
+    info!("Created Operation Request: {:?}", db_operation_request);
+
     let operation_request = OperationRequest::from(
         db_operation_request,
         gatekeeper,

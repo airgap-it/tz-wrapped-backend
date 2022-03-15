@@ -1,3 +1,6 @@
+[[server.admins]]
+public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
+
 [[tezos_nodes]]
 name = "Papers"
 url = "https://tezos-node.prod.gke.papers.tech"
@@ -26,13 +29,25 @@ token_id = 0
 operation_request_kind = "update_keyholders"
 
 [[contracts.gatekeepers]]
-public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
+public_key = "edpkur75zYgZauFuFAP5hBNtjSXH2agcsUT91GJZKT7mx1zuCV2CEK"
+
+[[contracts.gatekeepers]]
+public_key = "edpktfv1MJjNkvLXWHqUshyq2y7yKjvH9RNBKLCgKNbSkonhPbjYsC"
+
+[[contracts.gatekeepers]]
+public_key = "edpkvWKVSXH5HD6ky8ZMaiVQQKC91FyoY7NTpgK2aqia5bRBvXnsPF"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuBMxCHKtG2SUeNbucqs7PzYZtQKT9WJGcQVVPbbe4RLJjBk8zF"
+
+[[contracts.gatekeepers]]
+public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
 
 [[contracts]]
 address = "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
 decimals = 8
 kind = "fa1"
-multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"
+multisig = "KT1FcmdSroia1ys1WM6mL2rzB1haLxyy3MH9"
 name = "tzBTC - Operator"
 symbol = "tzBTC"
 token_id = 0
@@ -47,13 +62,16 @@ operation_request_kind = "burn"
 operation_request_kind = "update_keyholders"
 
 [[contracts.gatekeepers]]
-public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
+public_key = "edpkv7S5kYHd7qqMnCt12fCKZpsr24jRAXiEJxxN9TWqufDGxFKYAJ"
 
 [[contracts.gatekeepers]]
-public_key = "edpkuRZepzeDzSsJEHTSPc5CkWySwai4LTYn7EaFbjmvx6xnwafTKJ"
+public_key = "edpkuDrjKhzfRpgfFMgrvZosGWTmMSVerTq7WGNvQZNayHWGRqzYcc"
 
 [[contracts.gatekeepers]]
-public_key = "edpkv8vx9bkSY24EEV2LsfW3ZKavoma5CcvdQCqg6UUokPqxsPQ6BZ"
+public_key = "edpku5KnvR4eyPVhmqoNv9uY8BvcSu8Pq4YtdYcAM11YhGCRADEypw"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuG9moBtUHgSzbkLcpUzCdSgiE6r9YjQu3dQU3AtuCPvHbJbFNi"
 
 [[contracts.gatekeepers]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
