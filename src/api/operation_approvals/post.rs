@@ -37,6 +37,9 @@ pub async fn operation_approval(
         get_operation_request_and_contract(&pool, body.operation_request_id).await?;
 
     current_user.require_roles(vec![UserKind::Keyholder], contract.id)?;
+
+    info!("Received Operation Request Approval: {:?}", body);
+
     let conn = pool.get()?;
     let node_url =
         web::block::<_, _, APIError>(move || Ok(NodeEndpoint::get_selected(&conn)?.url)).await?;
@@ -71,6 +74,8 @@ pub async fn operation_approval(
 
     let result = OperationApproval::from(inserted_approval, keyholder)?;
 
+    info!("Created Operation Approval: {:?}", result);
+
     let request_id = operation_request.id;
     let conn = pool.get()?;
     let total_approvals =
@@ -98,7 +103,7 @@ pub async fn operation_approval(
         })
         .await?;
         info!(
-            "Enough signatures collected for operation: {:?}",
+            "Enough signatures collected for operation request: {:?}",
             request_id
         );
     } else {

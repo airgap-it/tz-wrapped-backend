@@ -59,14 +59,16 @@ fn database_url() -> String {
     format!("postgres://{}:{}@{}:5432/{}", user, password, host, name)
 }
 
-async fn index() -> impl Responder {
+async fn health() -> impl Responder {
     "Hello world!"
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "info");
-    env_logger::init();
+    std::env::set_var("RUST_LOG", "info,actix_web::middleware::logger=warn");
+    env_logger::Builder::from_default_env()
+        .target(env_logger::Target::Stdout)
+        .init();
 
     let database_url = database_url();
     let manager = ConnectionManager::<PgConnection>::new(database_url);
@@ -125,7 +127,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(session)
             .wrap(cors)
             .wrap(middleware::Compress::default())
-            .route("/", web::get().to(index))
+            .route("/", web::get().to(health))
             .service(
                 web::scope("/api/v1")
                     .data(CONFIG.server.clone())
