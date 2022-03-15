@@ -17,7 +17,7 @@ use crate::{
 
 use super::{pagination::Paginate, proposed_user::ProposedUser};
 
-#[derive(Queryable, Identifiable, Associations, Debug)]
+#[derive(Queryable, Identifiable, Associations, Debug, Clone)]
 #[belongs_to(User, foreign_key = "user_id")]
 #[belongs_to(Contract, foreign_key = "contract_id")]
 pub struct OperationRequest {
@@ -379,7 +379,7 @@ impl OperationRequest {
     }
 }
 
-#[derive(Insertable, Debug)]
+#[derive(Insertable, Debug, Clone)]
 #[table_name = "operation_requests"]
 pub struct NewOperationRequest {
     pub user_id: Uuid,

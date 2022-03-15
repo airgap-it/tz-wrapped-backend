@@ -2,21 +2,22 @@ use std::convert::TryInto;
 
 use crate::{
     api::models::operation_request::OperationRequestKind,
-    db::models::user::User,
     tezos::{
         self,
         micheline::{data, int, sequence, string, types},
     },
 };
 use crate::{
-    db::models::{contract::Contract, operation_request::OperationRequest},
+    db::models::contract::Contract,
     tezos::{micheline::MichelsonV1Expression, TzError},
 };
 use async_trait::async_trait;
 use num_bigint::BigInt;
 use tezos::micheline::{extract_key, extract_string, instructions};
 
-use super::{validate, Multisig, Parameters, SignableMessage, Signature, Storage};
+use super::{
+    validate, Multisig, OperationRequestParams, Parameters, SignableMessage, Signature, Storage,
+};
 
 pub struct GenericMultisig {
     address: String,
@@ -56,18 +57,19 @@ impl Multisig for GenericMultisig {
     async fn signable_message(
         &self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
     ) -> Result<SignableMessage, TzError> {
-        validate(operation_request, &proposed_keyholders)?;
+        validate(operation_request_params, &proposed_keyholders_pk)?;
 
-        let message = self.michelson_message(contract, operation_request, proposed_keyholders);
+        let message =
+            self.michelson_message(contract, operation_request_params, proposed_keyholders_pk);
 
         let data = data::pair(
-            string(operation_request.chain_id.clone()),
+            string(operation_request_params.chain_id.clone()),
             data::pair(
                 string(self.address.clone()),
-                data::pair(int(operation_request.nonce), message),
+                data::pair(int(operation_request_params.nonce), message),
             ),
         );
         let schema = types::pair(
@@ -91,11 +93,11 @@ impl Multisig for GenericMultisig {
     async fn transaction_parameters(
         &mut self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
         signatures: Vec<Signature<'_>>,
     ) -> Result<Parameters, TzError> {
-        validate(operation_request, &proposed_keyholders)?;
+        validate(operation_request_params, &proposed_keyholders_pk)?;
 
         let mut signature_map_items = signatures
             .into_iter()
@@ -116,13 +118,13 @@ impl Multisig for GenericMultisig {
 
         let value = self.michelson_transaction_parameters(
             contract,
-            operation_request,
-            proposed_keyholders,
+            operation_request_params,
+            proposed_keyholders_pk,
             signature_map,
         );
 
         let operation_request_kind: OperationRequestKind =
-            operation_request.kind.try_into().unwrap();
+            operation_request_params.kind.try_into().unwrap();
         let entrypoint = GenericMultisig::entrypoint(operation_request_kind);
 
         Ok(Parameters { entrypoint, value })
@@ -152,19 +154,23 @@ impl GenericMultisig {
     fn michelson_transaction_parameters(
         &self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
         signature_map: MichelsonV1Expression,
     ) -> MichelsonV1Expression {
         let operation_request_kind: OperationRequestKind =
-            operation_request.kind.try_into().unwrap();
+            operation_request_params.kind.try_into().unwrap();
 
         match operation_request_kind {
             OperationRequestKind::Mint => {
                 let lambda = self.mint_lambda(
-                    operation_request.target_address.as_ref().unwrap().into(),
+                    operation_request_params
+                        .target_address
+                        .as_ref()
+                        .unwrap()
+                        .into(),
                     contract.pkh.clone(),
-                    operation_request
+                    operation_request_params
                         .amount
                         .as_ref()
                         .unwrap()
@@ -178,7 +184,7 @@ impl GenericMultisig {
             OperationRequestKind::Burn => {
                 let lambda = self.burn_lambda(
                     contract.pkh.clone(),
-                    operation_request
+                    operation_request_params
                         .amount
                         .as_ref()
                         .unwrap()
@@ -190,8 +196,8 @@ impl GenericMultisig {
                 data::pair(lambda, signature_map)
             }
             OperationRequestKind::UpdateKeyholders => self.update_keyholders_michelson_parameters(
-                operation_request.threshold.unwrap(),
-                proposed_keyholders.unwrap(),
+                operation_request_params.threshold.unwrap(),
+                proposed_keyholders_pk.unwrap(),
                 signature_map,
             ),
         }
@@ -200,17 +206,21 @@ impl GenericMultisig {
     fn michelson_message(
         &self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
     ) -> MichelsonV1Expression {
         let operation_request_kind: OperationRequestKind =
-            operation_request.kind.try_into().unwrap();
+            operation_request_params.kind.try_into().unwrap();
 
         match operation_request_kind {
             OperationRequestKind::Mint => self.mint_lambda(
-                operation_request.target_address.as_ref().unwrap().into(),
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
                 contract.pkh.clone(),
-                operation_request
+                operation_request_params
                     .amount
                     .as_ref()
                     .unwrap()
@@ -220,7 +230,7 @@ impl GenericMultisig {
             ),
             OperationRequestKind::Burn => self.burn_lambda(
                 contract.pkh.clone(),
-                operation_request
+                operation_request_params
                     .amount
                     .as_ref()
                     .unwrap()
@@ -229,8 +239,8 @@ impl GenericMultisig {
                 contract.token_id.into(),
             ),
             OperationRequestKind::UpdateKeyholders => self.update_keyholders_michelson_message(
-                operation_request.threshold.unwrap(),
-                proposed_keyholders.unwrap(),
+                operation_request_params.threshold.unwrap(),
+                proposed_keyholders_pk.unwrap(),
             ),
         }
     }
@@ -313,7 +323,7 @@ impl GenericMultisig {
     fn update_keyholders_michelson_parameters(
         &self,
         threshold: i64,
-        keyholders: Vec<User>,
+        keyholders: Vec<String>,
         signature_map: MichelsonV1Expression,
     ) -> MichelsonV1Expression {
         data::pair(
@@ -322,7 +332,7 @@ impl GenericMultisig {
                 sequence(
                     keyholders
                         .into_iter()
-                        .map(|user| string(user.public_key))
+                        .map(|public_key| string(public_key))
                         .collect(),
                 ),
                 signature_map,
@@ -333,14 +343,14 @@ impl GenericMultisig {
     fn update_keyholders_michelson_message(
         &self,
         threshold: i64,
-        keyholders: Vec<User>,
+        keyholders: Vec<String>,
     ) -> MichelsonV1Expression {
         data::pair(
             int(threshold),
             sequence(
                 keyholders
                     .into_iter()
-                    .map(|user| string(user.public_key))
+                    .map(|public_key| string(public_key))
                     .collect(),
             ),
         )

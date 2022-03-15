@@ -1,14 +1,32 @@
-[tezos]
-node_url = "https://tezos-edonet-node.prod.gke.papers.tech"
+[[server.admins]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+
+[[server.admins]]
+public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
+
+[[tezos_nodes]]
+name = "Papers"
+url = "https://tezos-hangzhounet-node.prod.gke.papers.tech"
+network = "hangzhounet"
+
+[[tezos_nodes]]
+name = "SmartPy"
+url = "https://hangzhounet.smartpy.io"
+network = "hangzhounet"
+
+[[tezos_nodes]]
+name = "Cryptonomic"
+url = "https://tezos-hangzhou.cryptonomic-infra.tech"
+network = "hangzhounet"
 
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
-multisig = "KT1KiJ1N9wgEVGkgPDYhLBYRBMPy1RG3pN2J"
-name = "tzBTC - Owner"
-kind = "fa1"
-token_id = 0
-symbol = "tzBTC"
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
 decimals = 8
+kind = "fa1"
+multisig = "KT19LDmB7UV7q4vpvcnRrh3sHogFrXWwTXrt"
+name = "tzBTC - Owner"
+symbol = "tzBTC"
+token_id = 0
 
 [[contracts.capabilities]]
 operation_request_kind = "update_keyholders"
@@ -22,14 +40,17 @@ public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
 [[contracts.gatekeepers]]
 public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
+[[contracts.gatekeepers]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
-multisig = "KT1WHkRut4W4jCjarMG77brvjvD6WN96arYg"
-name = "tzBTC - Operator"
-kind = "fa1"
-token_id = 0
-symbol = "tzBTC"
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
 decimals = 8
+kind = "fa1"
+multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"
+name = "tzBTC - Operator"
+symbol = "tzBTC"
+token_id = 0
 
 [[contracts.capabilities]]
 operation_request_kind = "mint"
@@ -51,3 +72,6 @@ public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
 [[contracts.gatekeepers]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
+
+[[contracts.gatekeepers]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"

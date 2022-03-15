@@ -1,22 +1,37 @@
 [server]
-domain_name = "localhost"
 address = "0.0.0.0:8080"
+domain_name = "localhost"
 
-[tezos]
-node_url = "https://tezos-edonet-node.prod.gke.papers.tech"
+[[server.admins]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+
+[[tezos_nodes]]
+name = "Papers"
+url = "https://tezos-hangzhounet-node.prod.gke.papers.tech"
+network = "hangzhounet"
+
+[[tezos_nodes]]
+name = "SmartPy"
+url = "https://hangzhounet.smartpy.io"
+network = "hangzhounet"
+
+[[tezos_nodes]]
+name = "Cryptonomic"
+url = "https://tezos-hangzhou.cryptonomic-infra.tech"
+network = "hangzhounet"
 
 [database]
 host = "localhost"
 
 # Contract config for tzBTC Owner
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"  # address of the contract
-multisig = "KT1KiJ1N9wgEVGkgPDYhLBYRBMPy1RG3pN2J" # address of the multisig contract used to interact with the contract
-name = "tzBTC - Owner"                            # The name displayed in the frontend dropdown menu
-kind = "fa1"                                      # this can either be fa1 or fa2
-token_id = 0                                      # this value is not important if the kind value is fa1
-symbol = "tzBTC"
-decimals = 8
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC" # address of the contract
+decimals = 8 
+kind = "fa1" # this can either be fa1 or fa2
+multisig = "KT19LDmB7UV7q4vpvcnRrh3sHogFrXWwTXrt" # address of the multisig contract used to interact with the contract
+name = "tzBTC - Owner" # The name displayed in the frontend dropdown menu
+symbol = "tzBTC" 
+token_id = 0 # this value is not important if the kind value is fa1
 
 [[contracts.capabilities]]
 operation_request_kind = "update_keyholders" # what the multisig contract can do, valid values are: update_keyholders, mint, burn
@@ -33,13 +48,13 @@ public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
 # Contract config for tzBTC Operator
 [[contracts]]
-address = "KT192P1oDzf3fNb7BSEiC1d74KvQf4HrivBE"
-multisig = "KT1WHkRut4W4jCjarMG77brvjvD6WN96arYg"
-name = "tzBTC - Operator"
-kind = "fa1"
-token_id = 0
-symbol = "tzBTC"
+address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
 decimals = 8
+kind = "fa1"
+multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"
+name = "tzBTC - Operator"
+symbol = "tzBTC"
+token_id = 0
 
 [[contracts.capabilities]]
 operation_request_kind = "mint"

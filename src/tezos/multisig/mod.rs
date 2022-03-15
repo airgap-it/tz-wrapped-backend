@@ -7,7 +7,10 @@ use std::{
 
 use crate::{
     api::models::{contract::ContractKind, operation_request::OperationRequestKind},
-    db::models::{contract::Contract, operation_request::OperationRequest, user::User},
+    db::models::{
+        contract::Contract, operation_request::NewOperationRequest,
+        operation_request::OperationRequest,
+    },
     tezos::micheline::{extract_prim, primitive::Primitive},
 };
 use crate::{
@@ -17,6 +20,7 @@ use crate::{
         TzError,
     },
 };
+use bigdecimal::BigDecimal;
 use serde::Serialize;
 
 use super::{coding::decode_public_key, micheline::extract_bytes};
@@ -49,25 +53,25 @@ pub trait Multisig: Send + Sync {
     async fn signable_message(
         &self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
     ) -> Result<SignableMessage, TzError>;
 
     async fn transaction_parameters(
         &mut self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
         signatures: Vec<Signature<'_>>,
     ) -> Result<Parameters, TzError>;
 }
 
 fn validate(
-    operation_request: &OperationRequest,
-    proposed_keyholders: &Option<Vec<User>>,
+    operation_request_params: &OperationRequestParams,
+    proposed_keyholders_pk: &Option<Vec<String>>,
 ) -> Result<(), TzError> {
-    let operation_request_kind: OperationRequestKind = operation_request.kind.try_into()?;
-    if operation_request.amount.is_none()
+    let operation_request_kind: OperationRequestKind = operation_request_params.kind.try_into()?;
+    if operation_request_params.amount.is_none()
         && (operation_request_kind == OperationRequestKind::Mint
             || operation_request_kind == OperationRequestKind::Burn)
     {
@@ -76,7 +80,7 @@ fn validate(
         });
     }
 
-    if operation_request.target_address.is_none()
+    if operation_request_params.target_address.is_none()
         && operation_request_kind == OperationRequestKind::Mint
     {
         return Err(TzError::InvalidValue {
@@ -84,7 +88,7 @@ fn validate(
         });
     }
 
-    if operation_request.threshold.is_none()
+    if operation_request_params.threshold.is_none()
         && operation_request_kind == OperationRequestKind::UpdateKeyholders
     {
         return Err(TzError::InvalidValue {
@@ -93,7 +97,7 @@ fn validate(
         });
     }
 
-    if proposed_keyholders.is_none()
+    if proposed_keyholders_pk.is_none()
         && operation_request_kind == OperationRequestKind::UpdateKeyholders
     {
         return Err(TzError::InvalidValue {
@@ -122,6 +126,41 @@ pub struct SignableMessage {
     pub packed_data: String,
     pub michelson_data: MichelsonV1Expression,
     pub michelson_type: MichelsonV1Expression,
+}
+
+pub struct OperationRequestParams {
+    pub target_address: Option<String>,
+    pub amount: Option<BigDecimal>,
+    pub threshold: Option<i64>,
+    pub kind: i16,
+    pub chain_id: String,
+    pub nonce: i64,
+}
+
+impl From<OperationRequest> for OperationRequestParams {
+    fn from(value: OperationRequest) -> Self {
+        OperationRequestParams {
+            target_address: value.target_address,
+            amount: value.amount,
+            threshold: value.threshold,
+            kind: value.kind,
+            chain_id: value.chain_id,
+            nonce: value.nonce,
+        }
+    }
+}
+
+impl From<NewOperationRequest> for OperationRequestParams {
+    fn from(value: NewOperationRequest) -> Self {
+        OperationRequestParams {
+            target_address: value.target_address,
+            amount: value.amount,
+            threshold: value.threshold,
+            kind: value.kind,
+            chain_id: value.chain_id,
+            nonce: value.nonce,
+        }
+    }
 }
 
 impl SignableMessage {

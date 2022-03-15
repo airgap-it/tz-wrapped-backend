@@ -5,6 +5,7 @@ use actix_web::{
     web::{self, Path},
     HttpResponse,
 };
+use log::info;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -77,6 +78,11 @@ pub async fn operation_request(
                 &operation_request_id,
                 patch_operation_request.operation_hash.clone(),
             )?;
+
+            info!(
+                "Operation request has been marked as injected: {:?}",
+                updated_operation_request
+            );
 
             let user = User::get(&conn, operation_request.user_id)?;
             let keyholders = User::get_all_active(

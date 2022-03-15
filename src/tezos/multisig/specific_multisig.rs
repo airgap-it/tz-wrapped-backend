@@ -5,11 +5,10 @@ use num_bigint::BigInt;
 
 use crate::{
     api::models::operation_request::OperationRequestKind,
-    db::models::user::User,
     tezos::micheline::{bytes, data, int, sequence, string, types},
 };
 use crate::{
-    db::models::{contract::Contract, operation_request::OperationRequest},
+    db::models::contract::Contract,
     tezos::{
         coding,
         micheline::{primitive::Primitive, primitive::Type, MichelsonV1Expression},
@@ -17,7 +16,9 @@ use crate::{
     },
 };
 
-use super::{validate, Multisig, Parameters, SignableMessage, Signature, Storage};
+use super::{
+    validate, Multisig, OperationRequestParams, Parameters, SignableMessage, Signature, Storage,
+};
 
 pub struct SpecificMultisig {
     address: String,
@@ -57,16 +58,19 @@ impl Multisig for SpecificMultisig {
     async fn signable_message(
         &self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
     ) -> Result<SignableMessage, TzError> {
-        validate(operation_request, &proposed_keyholders)?;
-        let call =
-            self.michelson_transaction_parameters(contract, operation_request, proposed_keyholders);
+        validate(operation_request_params, &proposed_keyholders_pk)?;
+        let call = self.michelson_transaction_parameters(
+            contract,
+            operation_request_params,
+            proposed_keyholders_pk,
+        );
 
         let micheline = data::pair(
             string(self.address.to_owned()),
-            data::pair(int(operation_request.nonce), call),
+            data::pair(int(operation_request_params.nonce), call),
         );
 
         let main_parameter_schema = self.fetch_main_parameter_schema().await?;
@@ -93,13 +97,16 @@ impl Multisig for SpecificMultisig {
     async fn transaction_parameters(
         &mut self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
         signatures: Vec<Signature<'_>>,
     ) -> Result<Parameters, TzError> {
-        validate(operation_request, &proposed_keyholders)?;
-        let call =
-            self.michelson_transaction_parameters(contract, operation_request, proposed_keyholders);
+        validate(operation_request_params, &proposed_keyholders_pk)?;
+        let call = self.michelson_transaction_parameters(
+            contract,
+            operation_request_params,
+            proposed_keyholders_pk,
+        );
 
         let ordered_signature_list = self
             .approvers()
@@ -121,7 +128,7 @@ impl Multisig for SpecificMultisig {
             })
             .collect::<Result<Vec<MichelsonV1Expression>, TzError>>()?;
         let value = data::pair(
-            data::pair(int(operation_request.nonce), call),
+            data::pair(int(operation_request_params.nonce), call),
             sequence(ordered_signature_list),
         );
 
@@ -171,17 +178,21 @@ impl SpecificMultisig {
     fn michelson_transaction_parameters(
         &self,
         contract: &Contract,
-        operation_request: &OperationRequest,
-        proposed_keyholders: Option<Vec<User>>,
+        operation_request_params: &OperationRequestParams,
+        proposed_keyholders_pk: Option<Vec<String>>,
     ) -> MichelsonV1Expression {
         let operation_request_kind: OperationRequestKind =
-            operation_request.kind.try_into().unwrap();
+            operation_request_params.kind.try_into().unwrap();
 
         match operation_request_kind {
             OperationRequestKind::Mint => self.mint_michelson_parameters(
-                operation_request.target_address.as_ref().unwrap().into(),
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
                 contract.pkh.clone(),
-                operation_request
+                operation_request_params
                     .amount
                     .as_ref()
                     .unwrap()
@@ -191,7 +202,7 @@ impl SpecificMultisig {
             ),
             OperationRequestKind::Burn => self.burn_michelson_parameters(
                 contract.pkh.clone(),
-                operation_request
+                operation_request_params
                     .amount
                     .as_ref()
                     .unwrap()
@@ -200,8 +211,8 @@ impl SpecificMultisig {
                 contract.token_id.into(),
             ),
             OperationRequestKind::UpdateKeyholders => self.update_keyholders_michelson_parameters(
-                operation_request.threshold.unwrap(),
-                proposed_keyholders.unwrap(),
+                operation_request_params.threshold.unwrap(),
+                proposed_keyholders_pk.unwrap(),
             ),
         }
     }
@@ -234,14 +245,14 @@ impl SpecificMultisig {
     fn update_keyholders_michelson_parameters(
         &self,
         threshold: i64,
-        keyholders: Vec<User>,
+        keyholders: Vec<String>,
     ) -> MichelsonV1Expression {
         data::right(data::pair(
             int(threshold),
             sequence(
                 keyholders
                     .into_iter()
-                    .map(|keyholder| string(keyholder.public_key))
+                    .map(|public_key| string(public_key))
                     .collect(),
             ),
         ))

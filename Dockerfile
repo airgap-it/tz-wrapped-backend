@@ -1,4 +1,4 @@
-FROM rust:1.52.1 as build
+FROM rust:1.59.0 as build
 ENV PKG_CONFIG_ALLOW_CROSS=1
 
 WORKDIR /usr/src/tz-wrapped-backend
@@ -14,7 +14,7 @@ ADD . ./
 RUN rm ./target/release/deps/tz_wrapped_backend*
 RUN cargo install --path .
 
-FROM debian:buster-slim
+FROM debian:stable-slim
 
 RUN apt-get update \
     && apt-get install -y ca-certificates tzdata \
