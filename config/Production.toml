@@ -75,3 +75,9 @@ public_key = "edpkuG9moBtUHgSzbkLcpUzCdSgiE6r9YjQu3dQU3AtuCPvHbJbFNi"
 
 [[contracts.gatekeepers]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
+
+[[contracts.gatekeepers]]
+public_key = "edpkuRZepzeDzSsJEHTSPc5CkWySwai4LTYn7EaFbjmvx6xnwafTKJ"
