@@ -38,6 +38,7 @@ pub async fn operation_request(
     server_settings: web::Data<settings::Server>,
     session: Session,
 ) -> Result<HttpResponse, APIError> {
+    let new_operation_request = new_operation_request.into_inner();
     let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
 
     let conn = pool.get()?;
@@ -47,10 +48,7 @@ pub async fn operation_request(
         _ => UserKind::Gatekeeper,
     };
     current_user.require_roles(vec![required_user_kind], contract_id)?;
-    info!(
-        "New Operation Request received: {:?}",
-        new_operation_request
-    );
+
     let operation_request_kind: i16 = new_operation_request.kind.into();
     let (contract, max_local_nonce) = web::block::<_, _, APIError>(move || {
         let (contract, capabilities) = Contract::get_with_capabilities(&conn, &contract_id)?;
@@ -72,7 +70,10 @@ pub async fn operation_request(
     })
     .await?;
 
-    info!("Operation Request for contract: {:?}", contract);
+    info!(
+        "User {} submits new operation request on contract {}:\n{:?}",
+        current_user.address, contract.display_name, new_operation_request
+    );
 
     let conn = pool.get()?;
     let node_url =
@@ -228,7 +229,10 @@ pub async fn operation_request(
     })
     .await?;
 
-    info!("Created Operation Request: {:?}", db_operation_request);
+    info!(
+        "Successfully created operation request: {:?}",
+        db_operation_request
+    );
 
     let operation_request = OperationRequest::from(
         db_operation_request,
@@ -265,6 +269,11 @@ fn verify_hash(
     maybe_ledger_hash: Option<String>,
 ) -> Result<(), APIError> {
     if let Some(ledger_hash) = maybe_ledger_hash {
+        let expected_ledger_hash = signable_message.ledger_blake2b_hash()?;
+        info!(
+            "Verifying provided ledger hash {} with:\nData: {}\nData type: {}\nExpected ledger hash: {}",
+            ledger_hash, signable_message.michelson_data, signable_message.michelson_type, expected_ledger_hash
+        );
         if signable_message.ledger_blake2b_hash()? != ledger_hash {
             return Err(APIError::InvalidOperationRequest {
                 description: "Invalid ledger hash".to_string(),
