@@ -32,13 +32,14 @@ pub async fn operation_approval(
     session: Session,
 ) -> Result<HttpResponse, APIError> {
     let current_user = get_current_user(&session, server_settings.inactivity_timeout_seconds)?;
-
+    let new_operation_approval = body.into_inner();
     let (operation_request, contract, proposed_keyholders) =
-        get_operation_request_and_contract(&pool, body.operation_request_id).await?;
+        get_operation_request_and_contract(&pool, new_operation_approval.operation_request_id)
+            .await?;
 
     current_user.require_roles(vec![UserKind::Keyholder], contract.id)?;
 
-    info!("Received Operation Request Approval: {:?}", body);
+    info!("User {} submits new operation approval on contract {}:\n{:?}\nFor operation request:\n{:?}", current_user.address, contract.display_name, new_operation_approval, operation_request);
 
     let conn = pool.get()?;
     let node_url =
@@ -67,14 +68,27 @@ pub async fn operation_approval(
 
     crate::db::sync_keyholders(&pool, vec![contract.clone()], &node_url).await?;
 
-    let keyholder =
-        find_keyholder_and_validate_signature(&pool, &signable_message, &contract, &body).await?;
+    let keyholder = find_keyholder_and_validate_signature(
+        &pool,
+        &signable_message,
+        &contract,
+        &new_operation_approval,
+    )
+    .await?;
+
+    if keyholder.address != current_user.address {
+        info!(
+            "User {} is uploading signature for keyholder: {} / {}",
+            current_user.address, keyholder.address, keyholder.public_key
+        );
+    }
+
     let keyholder_id = keyholder.id;
-    let inserted_approval = store_approval(&pool, keyholder_id, body.into_inner()).await?;
+    let inserted_approval = store_approval(&pool, keyholder_id, new_operation_approval).await?;
 
     let result = OperationApproval::from(inserted_approval, keyholder)?;
 
-    info!("Created Operation Approval: {:?}", result);
+    info!("Successfully created operation approval: {:?}", result);
 
     let request_id = operation_request.id;
     let conn = pool.get()?;

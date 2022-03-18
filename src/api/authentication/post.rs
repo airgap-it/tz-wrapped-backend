@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use actix_session::Session;
 use actix_web::{web, HttpResponse};
+use log::info;
 
 use crate::{
     api::models::{
@@ -70,6 +71,8 @@ pub async fn sign_in(
     set_current_user(&session, &session_user).map_err(|_error| APIError::Internal {
         description: "failed to set current user".into(),
     })?;
+
+    info!("Signed in user: {:?}", session_user);
 
     Ok(HttpResponse::Ok().json(AuthUser::from(user.to_owned(), session_user)))
 }
