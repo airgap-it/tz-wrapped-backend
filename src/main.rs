@@ -65,7 +65,7 @@ async fn health() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "info,actix_web::middleware::logger=warn");
+    std::env::set_var("RUST_LOG", "info");
     env_logger::Builder::from_default_env()
         .target(env_logger::Target::Stdout)
         .init();
@@ -122,12 +122,12 @@ async fn main() -> std::io::Result<()> {
             .allow_any_header()
             .supports_credentials();
         App::new()
+            .route("/", web::get().to(health))
             .data(pool.clone())
             .wrap(middleware::Logger::default())
             .wrap(session)
             .wrap(cors)
             .wrap(middleware::Compress::default())
-            .route("/", web::get().to(health))
             .service(
                 web::scope("/api/v1")
                     .data(CONFIG.server.clone())
