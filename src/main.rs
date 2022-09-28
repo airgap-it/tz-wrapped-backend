@@ -73,6 +73,7 @@ async fn main() -> std::io::Result<()> {
     let database_url = database_url();
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool = r2d2::Pool::builder()
+        .max_size(5)
         .build(manager)
         .expect("Failed to create pool.");
 
