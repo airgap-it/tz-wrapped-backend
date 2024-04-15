@@ -33,12 +33,6 @@ operation_request_kind = "remove_operator"
 operation_request_kind = "set_redeem_address"
 
 [[contracts.capabilities]]
-operation_request_kind = "transfer_ownership"
-
-[[contracts.capabilities]]
-operation_request_kind = "accept_ownership"
-
-[[contracts.capabilities]]
 operation_request_kind = "update_keyholders"
 
 [[contracts.gatekeepers]]
