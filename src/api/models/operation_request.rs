@@ -100,11 +100,21 @@ pub enum OperationRequestKind {
     Mint = 0,
     Burn = 1,
     UpdateKeyholders = 2,
+    AddOperator = 3,
+    RemoveOperator = 4,
+    SetRedeemAddress = 5,
+    TransferOwnership = 6,
+    AcceptOwnership = 7,
 }
 
 const MINT: &'static str = "mint";
 const BURN: &'static str = "burn";
 const UPDATE_KEYHOLDERS: &'static str = "update_keyholders";
+const ADD_OPERATOR: &'static str = "add_operator";
+const REMOVE_OPERATOR: &'static str = "remove_operator";
+const SET_REDEEM_ADDRESS: &'static str = "set_redeem_address";
+const TRANSFER_OWNERSHIP: &'static str = "transfer_ownership";
+const ACCEPT_OWNERSHIP: &'static str = "accept_ownership";
 
 impl TryFrom<&str> for OperationRequestKind {
     type Error = APIError;
@@ -114,6 +124,11 @@ impl TryFrom<&str> for OperationRequestKind {
             MINT => Ok(OperationRequestKind::Mint),
             BURN => Ok(OperationRequestKind::Burn),
             UPDATE_KEYHOLDERS => Ok(OperationRequestKind::UpdateKeyholders),
+            ADD_OPERATOR => Ok(OperationRequestKind::AddOperator),
+            REMOVE_OPERATOR => Ok(OperationRequestKind::RemoveOperator),
+            SET_REDEEM_ADDRESS => Ok(OperationRequestKind::SetRedeemAddress),
+            TRANSFER_OWNERSHIP => Ok(OperationRequestKind::TransferOwnership),
+            ACCEPT_OWNERSHIP => Ok(OperationRequestKind::AcceptOwnership),
             _ => Err(APIError::Internal {
                 description: format!("invalid operation kind: {}", value),
             }),
@@ -129,6 +144,11 @@ impl TryFrom<i16> for OperationRequestKind {
             0 => Ok(OperationRequestKind::Mint),
             1 => Ok(OperationRequestKind::Burn),
             2 => Ok(OperationRequestKind::UpdateKeyholders),
+            3 => Ok(OperationRequestKind::AddOperator),
+            4 => Ok(OperationRequestKind::RemoveOperator),
+            5 => Ok(OperationRequestKind::SetRedeemAddress),
+            6 => Ok(OperationRequestKind::TransferOwnership),
+            7 => Ok(OperationRequestKind::AcceptOwnership),
             _ => Err(APIError::InvalidValue {
                 description: format!("operation kind cannot be {}", value),
             }),
@@ -142,6 +162,11 @@ impl Into<&'static str> for OperationRequestKind {
             OperationRequestKind::Mint => MINT,
             OperationRequestKind::Burn => BURN,
             OperationRequestKind::UpdateKeyholders => UPDATE_KEYHOLDERS,
+            OperationRequestKind::AddOperator => ADD_OPERATOR,
+            OperationRequestKind::RemoveOperator => REMOVE_OPERATOR,
+            OperationRequestKind::SetRedeemAddress => SET_REDEEM_ADDRESS,
+            OperationRequestKind::TransferOwnership => TRANSFER_OWNERSHIP,
+            OperationRequestKind::AcceptOwnership => ACCEPT_OWNERSHIP,
         }
     }
 }
@@ -152,6 +177,11 @@ impl Into<i16> for OperationRequestKind {
             OperationRequestKind::Mint => 0,
             OperationRequestKind::Burn => 1,
             OperationRequestKind::UpdateKeyholders => 2,
+            OperationRequestKind::AddOperator => 3,
+            OperationRequestKind::RemoveOperator => 4,
+            OperationRequestKind::SetRedeemAddress => 5,
+            OperationRequestKind::TransferOwnership => 6,
+            OperationRequestKind::AcceptOwnership => 7,
         }
     }
 }
@@ -162,6 +192,11 @@ impl Display for OperationRequestKind {
             OperationRequestKind::Mint => "Mint",
             OperationRequestKind::Burn => "Burn",
             OperationRequestKind::UpdateKeyholders => "Multi Signature Update",
+            OperationRequestKind::AddOperator => "Add Operator",
+            OperationRequestKind::RemoveOperator => "Remove Operator",
+            OperationRequestKind::SetRedeemAddress => "Set Redeem Address",
+            OperationRequestKind::TransferOwnership => "Transfer Ownership",
+            OperationRequestKind::AcceptOwnership => "Accept Ownership",
         };
         write!(f, "{}", value)
     }
