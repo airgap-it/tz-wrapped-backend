@@ -5,7 +5,11 @@ use num_bigint::BigInt;
 
 use crate::{
     api::models::operation_request::OperationRequestKind,
-    tezos::micheline::{bytes, data, int, sequence, string, types},
+    tezos::micheline::{
+        bytes,
+        data::{self, unit},
+        int, sequence, string, types,
+    },
 };
 use crate::{
     db::models::contract::Contract,
@@ -214,6 +218,42 @@ impl SpecificMultisig {
                 operation_request_params.threshold.unwrap(),
                 proposed_keyholders_pk.unwrap(),
             ),
+            OperationRequestKind::AddOperator => self.add_operator_michelson_parameters(
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                contract.pkh.clone(),
+            ),
+            OperationRequestKind::RemoveOperator => self.remove_operator_michelson_parameters(
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                contract.pkh.clone(),
+            ),
+            OperationRequestKind::SetRedeemAddress => self.remove_operator_michelson_parameters(
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                contract.pkh.clone(),
+            ),
+            OperationRequestKind::TransferOwnership => self
+                .transfer_ownership_michelson_parameters(
+                    operation_request_params
+                        .target_address
+                        .as_ref()
+                        .unwrap()
+                        .into(),
+                    contract.pkh.clone(),
+                ),
+            OperationRequestKind::AcceptOwnership => {
+                self.accept_ownership_michelson_parameters(contract.pkh.clone())
+            }
         }
     }
 
@@ -239,6 +279,57 @@ impl SpecificMultisig {
         _token_id: i64,
     ) -> MichelsonV1Expression {
         let call = data::right(data::left(data::left(data::right(int(amount)))));
+        data::left(data::pair(call, string(contract_address)))
+    }
+
+    fn add_operator_michelson_parameters(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        let call = data::right(data::left(data::right(data::left(string(address)))));
+
+        data::left(data::pair(call, string(contract_address)))
+    }
+
+    fn remove_operator_michelson_parameters(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        let call = data::right(data::left(data::right(data::right(string(address)))));
+
+        data::left(data::pair(call, string(contract_address)))
+    }
+
+    fn set_redeem_address_michelson_parameters(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        let call = data::right(data::right(data::left(data::left(string(address)))));
+
+        data::left(data::pair(call, string(contract_address)))
+    }
+
+    fn transfer_ownership_michelson_parameters(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        let call = data::right(data::right(data::right(data::right(data::left(string(
+            address,
+        ))))));
+
+        data::left(data::pair(call, string(contract_address)))
+    }
+
+    fn accept_ownership_michelson_parameters(
+        &self,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        let call = data::right(data::right(data::right(data::right(data::right(unit())))));
+
         data::left(data::pair(call, string(contract_address)))
     }
 

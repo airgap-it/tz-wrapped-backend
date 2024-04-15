@@ -404,9 +404,19 @@ impl NewOperationRequest {
             });
         }
 
-        if self.target_address.is_none() && operation_request_kind == OperationRequestKind::Mint {
+        if self.target_address.is_none()
+            && (operation_request_kind == OperationRequestKind::Mint
+                || operation_request_kind == OperationRequestKind::AddOperator
+                || operation_request_kind == OperationRequestKind::RemoveOperator
+                || operation_request_kind == OperationRequestKind::SetRedeemAddress
+                || operation_request_kind == OperationRequestKind::TransferOwnership)
+        {
             return Err(TzError::InvalidValue {
-                description: "target_address is required for mint operation requests".to_owned(),
+                description: format!(
+                    "target_address is required for {} operation requests",
+                    operation_request_kind
+                )
+                .to_owned(),
             });
         }
 
