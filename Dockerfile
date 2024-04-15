@@ -12,9 +12,9 @@ RUN rm src/*.rs
 ADD . ./
 
 RUN rm ./target/release/deps/tz_wrapped_backend*
-RUN cargo install --path .
+RUN cargo install --locked --path .
 
-FROM debian:stable-slim
+FROM debian:oldstable-slim
 
 RUN apt-get update \
     && apt-get install -y ca-certificates tzdata \

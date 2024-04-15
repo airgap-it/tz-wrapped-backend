@@ -6,57 +6,37 @@ public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
 
 [[tezos_nodes]]
 name = "Papers"
-url = "https://tezos-hangzhounet-node.prod.gke.papers.tech"
-network = "hangzhounet"
+url = "https://tezos-ghostnet-node.prod.gke.papers.tech"
+network = "ghostnet"
 
 [[tezos_nodes]]
 name = "SmartPy"
-url = "https://hangzhounet.smartpy.io"
-network = "hangzhounet"
-
-[[tezos_nodes]]
-name = "Cryptonomic"
-url = "https://tezos-hangzhou.cryptonomic-infra.tech"
-network = "hangzhounet"
+url = "https://ghostnet.smartpy.io"
+network = "ghostnet"
 
 [[contracts]]
-address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
+address = "KT1FurYKnbVBkQ17b2gbvqZi4XLXvxKpJXWv"
 decimals = 8
 kind = "fa1"
-multisig = "KT19LDmB7UV7q4vpvcnRrh3sHogFrXWwTXrt"
+multisig = "KT1MeQd67djiEEkscx3USfQ7vFYg589DySpZ"
 name = "tzBTC - Owner"
 symbol = "tzBTC"
 token_id = 0
 
 [[contracts.capabilities]]
-operation_request_kind = "update_keyholders"
-
-[[contracts.gatekeepers]]
-public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
-
-[[contracts.gatekeepers]]
-public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
-
-[[contracts.gatekeepers]]
-public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
-
-[[contracts.gatekeepers]]
-public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
-
-[[contracts]]
-address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
-decimals = 8
-kind = "fa1"
-multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"
-name = "tzBTC - Operator"
-symbol = "tzBTC"
-token_id = 0
+operation_request_kind = "add_operator"
 
 [[contracts.capabilities]]
-operation_request_kind = "mint"
+operation_request_kind = "remove_operator"
 
 [[contracts.capabilities]]
-operation_request_kind = "burn"
+operation_request_kind = "set_redeem_address"
+
+# [[contracts.capabilities]]
+# operation_request_kind = "transfer_ownership"
+
+# [[contracts.capabilities]]
+# operation_request_kind = "accept_ownership"
 
 [[contracts.capabilities]]
 operation_request_kind = "update_keyholders"
@@ -71,7 +51,37 @@ public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
 public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
 
 [[contracts.gatekeepers]]
-public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
-
-[[contracts.gatekeepers]]
 public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+
+# [[contracts]]
+# address = "KT1P5PYmFTcCfAUF8N5mP77rZUS7Ji7gpjcC"
+# decimals = 8
+# kind = "fa1"
+# multisig = "KT1V5jtRwSqPXRVj3GKK6WG4YuomufrpkjdY"
+# name = "tzBTC - Operator"
+# symbol = "tzBTC"
+# token_id = 0
+
+# [[contracts.capabilities]]
+# operation_request_kind = "mint"
+
+# [[contracts.capabilities]]
+# operation_request_kind = "burn"
+
+# [[contracts.capabilities]]
+# operation_request_kind = "update_keyholders"
+
+# [[contracts.gatekeepers]]
+# public_key = "edpkuHG9N83cBavucaLSeeKX3AVjn9wDyFeFmrhaSLqvmBycP5N7Zs"
+
+# [[contracts.gatekeepers]]
+# public_key = "edpktfkToequZjyn3jz3GJobiYApkc5q4xnJiksStYbZkznUdsxDUw"
+
+# [[contracts.gatekeepers]]
+# public_key = "edpktgVTATaPnXTLUV88RmGKVF5GA12QXH1GKPpCcn56htnGpQbk2b"
+
+# [[contracts.gatekeepers]]
+# public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
+
+# [[contracts.gatekeepers]]
+# public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"

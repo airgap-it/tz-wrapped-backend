@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tz-wrapped-backend
@@ -15,6 +15,10 @@ spec:
     - host: tz-wrapped.dev.gke.papers.tech
       http:
         paths:
-          - backend:
-              serviceName: tz-wrapped-backend
-              servicePort: 80
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: tz-wrapped-backend
+                port:
+                  number: 80

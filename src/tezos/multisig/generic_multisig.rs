@@ -4,7 +4,10 @@ use crate::{
     api::models::operation_request::OperationRequestKind,
     tezos::{
         self,
-        micheline::{data, int, sequence, string, types},
+        micheline::{
+            data::{self, unit},
+            int, sequence, string, types,
+        },
     },
 };
 use crate::{
@@ -200,6 +203,59 @@ impl GenericMultisig {
                 proposed_keyholders_pk.unwrap(),
                 signature_map,
             ),
+            OperationRequestKind::AddOperator => {
+                let lambda = self.add_operator_lambda(
+                    operation_request_params
+                        .target_address
+                        .as_ref()
+                        .unwrap()
+                        .into(),
+                    contract.pkh.clone(),
+                );
+
+                data::pair(lambda, signature_map)
+            }
+            OperationRequestKind::RemoveOperator => {
+                let lambda = self.remove_operator_lambda(
+                    operation_request_params
+                        .target_address
+                        .as_ref()
+                        .unwrap()
+                        .into(),
+                    contract.pkh.clone(),
+                );
+
+                data::pair(lambda, signature_map)
+            }
+            OperationRequestKind::SetRedeemAddress => {
+                let lambda = self.set_redeem_address_lambda(
+                    operation_request_params
+                        .target_address
+                        .as_ref()
+                        .unwrap()
+                        .into(),
+                    contract.pkh.clone(),
+                );
+
+                data::pair(lambda, signature_map)
+            }
+            OperationRequestKind::TransferOwnership => {
+                let lambda = self.transfer_ownership_lambda(
+                    operation_request_params
+                        .target_address
+                        .as_ref()
+                        .unwrap()
+                        .into(),
+                    contract.pkh.clone(),
+                );
+
+                data::pair(lambda, signature_map)
+            }
+            OperationRequestKind::AcceptOwnership => {
+                let lambda = self.accept_ownership_lambda(contract.pkh.clone());
+
+                data::pair(lambda, signature_map)
+            }
         }
     }
 
@@ -242,6 +298,41 @@ impl GenericMultisig {
                 operation_request_params.threshold.unwrap(),
                 proposed_keyholders_pk.unwrap(),
             ),
+            OperationRequestKind::AddOperator => self.add_operator_lambda(
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                contract.pkh.clone(),
+            ),
+            OperationRequestKind::RemoveOperator => self.remove_operator_lambda(
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                contract.pkh.clone(),
+            ),
+            OperationRequestKind::SetRedeemAddress => self.set_redeem_address_lambda(
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                contract.pkh.clone(),
+            ),
+            OperationRequestKind::TransferOwnership => self.transfer_ownership_lambda(
+                operation_request_params
+                    .target_address
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                contract.pkh.clone(),
+            ),
+            OperationRequestKind::AcceptOwnership => {
+                self.accept_ownership_lambda(contract.pkh.clone())
+            }
         }
     }
 
@@ -320,6 +411,132 @@ impl GenericMultisig {
         // )]))))
     }
 
+    fn add_operator_lambda(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        sequence(vec![
+            instructions::drop(),
+            instructions::nil(types::operation()),
+            instructions::push(
+                types::address(),
+                string(format!("{}%addOperator", contract_address)),
+            ),
+            instructions::contract(types::address()),
+            sequence(vec![instructions::if_none(
+                sequence(vec![instructions::unit(), instructions::fail_with()]),
+                sequence(vec![]),
+            )]),
+            instructions::push(types::mutez(), int(0)),
+            instructions::nil(types::address()),
+            instructions::push(types::address(), string(address)),
+            instructions::cons(),
+            instructions::transfer_tokens(),
+            instructions::cons(),
+        ])
+    }
+
+    fn remove_operator_lambda(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        sequence(vec![
+            instructions::drop(),
+            instructions::nil(types::operation()),
+            instructions::push(
+                types::address(),
+                string(format!("{}%removeOperator", contract_address)),
+            ),
+            instructions::contract(types::address()),
+            sequence(vec![instructions::if_none(
+                sequence(vec![instructions::unit(), instructions::fail_with()]),
+                sequence(vec![]),
+            )]),
+            instructions::push(types::mutez(), int(0)),
+            instructions::nil(types::address()),
+            instructions::push(types::address(), string(address)),
+            instructions::cons(),
+            instructions::transfer_tokens(),
+            instructions::cons(),
+        ])
+    }
+
+    fn set_redeem_address_lambda(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        sequence(vec![
+            instructions::drop(),
+            instructions::nil(types::operation()),
+            instructions::push(
+                types::address(),
+                string(format!("{}%setRedeemAddress", contract_address)),
+            ),
+            instructions::contract(types::address()),
+            sequence(vec![instructions::if_none(
+                sequence(vec![instructions::unit(), instructions::fail_with()]),
+                sequence(vec![]),
+            )]),
+            instructions::push(types::mutez(), int(0)),
+            instructions::nil(types::address()),
+            instructions::push(types::address(), string(address)),
+            instructions::cons(),
+            instructions::transfer_tokens(),
+            instructions::cons(),
+        ])
+    }
+
+    fn transfer_ownership_lambda(
+        &self,
+        address: String,
+        contract_address: String,
+    ) -> MichelsonV1Expression {
+        sequence(vec![
+            instructions::drop(),
+            instructions::nil(types::operation()),
+            instructions::push(
+                types::address(),
+                string(format!("{}%transferOwnership", contract_address)),
+            ),
+            instructions::contract(types::address()),
+            sequence(vec![instructions::if_none(
+                sequence(vec![instructions::unit(), instructions::fail_with()]),
+                sequence(vec![]),
+            )]),
+            instructions::push(types::mutez(), int(0)),
+            instructions::nil(types::address()),
+            instructions::push(types::address(), string(address)),
+            instructions::cons(),
+            instructions::transfer_tokens(),
+            instructions::cons(),
+        ])
+    }
+
+    fn accept_ownership_lambda(&self, contract_address: String) -> MichelsonV1Expression {
+        sequence(vec![
+            instructions::drop(),
+            instructions::nil(types::operation()),
+            instructions::push(
+                types::address(),
+                string(format!("{}%acceptOwnership", contract_address)),
+            ),
+            instructions::contract(types::unit()),
+            sequence(vec![instructions::if_none(
+                sequence(vec![instructions::unit(), instructions::fail_with()]),
+                sequence(vec![]),
+            )]),
+            instructions::push(types::mutez(), int(0)),
+            instructions::nil(types::unit()),
+            instructions::push(types::address(), unit()),
+            instructions::cons(),
+            instructions::transfer_tokens(),
+            instructions::cons(),
+        ])
+    }
+
     fn update_keyholders_michelson_parameters(
         &self,
         threshold: i64,
@@ -358,7 +575,13 @@ impl GenericMultisig {
 
     fn entrypoint(operation_request_kind: OperationRequestKind) -> String {
         match operation_request_kind {
-            OperationRequestKind::Mint | OperationRequestKind::Burn => String::from("execute"),
+            OperationRequestKind::Mint
+            | OperationRequestKind::Burn
+            | OperationRequestKind::AddOperator
+            | OperationRequestKind::RemoveOperator
+            | OperationRequestKind::SetRedeemAddress
+            | OperationRequestKind::TransferOwnership
+            | OperationRequestKind::AcceptOwnership => String::from("execute"),
             OperationRequestKind::UpdateKeyholders => String::from("update_signatory"),
         }
     }

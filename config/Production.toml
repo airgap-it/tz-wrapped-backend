@@ -1,6 +1,9 @@
 [[server.admins]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
 
+[[server.admins]]
+public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
+
 [[tezos_nodes]]
 name = "Papers"
 url = "https://tezos-node.prod.gke.papers.tech"
@@ -11,11 +14,6 @@ name = "SmartPy"
 url = "https://mainnet.smartpy.io/"
 network = "mainnet"
 
-[[tezos_nodes]]
-name = "Cryptonomic"
-url = "https://tezos-prod.cryptonomic-infra.tech"
-network = "mainnet"
-
 [[contracts]]
 address = "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
 decimals = 8
@@ -24,6 +22,15 @@ multisig = "KT1QeoDkCAdJSSnm7zWz6Nv7W82qaoUz7kC9"
 name = "tzBTC - Owner"
 symbol = "tzBTC"
 token_id = 0
+
+[[contracts.capabilities]]
+operation_request_kind = "add_operator"
+
+[[contracts.capabilities]]
+operation_request_kind = "remove_operator"
+
+[[contracts.capabilities]]
+operation_request_kind = "set_redeem_address"
 
 [[contracts.capabilities]]
 operation_request_kind = "update_keyholders"
