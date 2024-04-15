@@ -1,9 +1,6 @@
 [[server.admins]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
 
-[[server.admins]]
-public_key = "edpkumVGEtDQgDAcMyB5FRn7UBLuhzg6D7aEnCDamXgjqGxavnsgvP"
-
 [[tezos_nodes]]
 name = "Papers"
 url = "https://tezos-node.prod.gke.papers.tech"
