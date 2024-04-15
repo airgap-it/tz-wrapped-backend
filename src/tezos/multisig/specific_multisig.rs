@@ -234,7 +234,7 @@ impl SpecificMultisig {
                     .into(),
                 contract.pkh.clone(),
             ),
-            OperationRequestKind::SetRedeemAddress => self.remove_operator_michelson_parameters(
+            OperationRequestKind::SetRedeemAddress => self.set_redeem_address_michelson_parameters(
                 operation_request_params
                     .target_address
                     .as_ref()
