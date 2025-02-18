@@ -1,6 +1,9 @@
 [[server.admins]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
 
+[[server.admins]]
+public_key = "edpktvdiC9azpXNLiZ9WpF7ZYao4gzhmMJmARuQW2xPyqUrmnbjx7X"
+
 [[tezos_nodes]]
 name = "Papers"
 url = "https://tezos-node.prod.gke.papers.tech"
@@ -85,3 +88,7 @@ public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
 
 [[contracts.gatekeepers]]
 public_key = "edpkuRZepzeDzSsJEHTSPc5CkWySwai4LTYn7EaFbjmvx6xnwafTKJ"
+
+[[contracts.gatekeepers]]
+public_key = "edpktvdiC9azpXNLiZ9WpF7ZYao4gzhmMJmARuQW2xPyqUrmnbjx7X"
+
