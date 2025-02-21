@@ -72,6 +72,9 @@ operation_request_kind = "burn"
 operation_request_kind = "update_keyholders"
 
 [[contracts.gatekeepers]]
+public_key = "edpktvdiC9azpXNLiZ9WpF7ZYao4gzhmMJmARuQW2xPyqUrmnbjx7X"
+
+[[contracts.gatekeepers]]
 public_key = "edpkv7S5kYHd7qqMnCt12fCKZpsr24jRAXiEJxxN9TWqufDGxFKYAJ"
 
 [[contracts.gatekeepers]]
