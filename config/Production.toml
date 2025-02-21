@@ -36,6 +36,9 @@ operation_request_kind = "set_redeem_address"
 operation_request_kind = "update_keyholders"
 
 [[contracts.gatekeepers]]
+public_key = "edpktvdiC9azpXNLiZ9WpF7ZYao4gzhmMJmARuQW2xPyqUrmnbjx7X"
+
+[[contracts.gatekeepers]]
 public_key = "edpkur75zYgZauFuFAP5hBNtjSXH2agcsUT91GJZKT7mx1zuCV2CEK"
 
 [[contracts.gatekeepers]]
@@ -88,7 +91,3 @@ public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
 
 [[contracts.gatekeepers]]
 public_key = "edpkuRZepzeDzSsJEHTSPc5CkWySwai4LTYn7EaFbjmvx6xnwafTKJ"
-
-[[contracts.gatekeepers]]
-public_key = "edpktvdiC9azpXNLiZ9WpF7ZYao4gzhmMJmARuQW2xPyqUrmnbjx7X"
-
