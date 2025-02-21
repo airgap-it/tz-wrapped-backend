@@ -53,6 +53,9 @@ public_key = "edpkuBMxCHKtG2SUeNbucqs7PzYZtQKT9WJGcQVVPbbe4RLJjBk8zF"
 [[contracts.gatekeepers]]
 public_key = "edpktrFtPi9VkDMJdxb7jqNLAm279sEDx9v22hWGtVoZYAsMWYypdk"
 
+[[contracts.gatekeepers]]
+public_key = "edpkv5m8iHDyczkP2w37976UcCfd8nWvu5Ytm88J3GWzJXEBGYv1Sr"
+
 [[contracts]]
 address = "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
 decimals = 8
@@ -94,3 +97,6 @@ public_key = "edpkuhvWerUKKkE7cAafLhmpkW5mAnXBk1wxwMpoBsoqpHqdhBw6Ex"
 
 [[contracts.gatekeepers]]
 public_key = "edpkuRZepzeDzSsJEHTSPc5CkWySwai4LTYn7EaFbjmvx6xnwafTKJ"
+
+[[contracts.gatekeepers]]
+public_key = "edpkv5m8iHDyczkP2w37976UcCfd8nWvu5Ytm88J3GWzJXEBGYv1Sr"
