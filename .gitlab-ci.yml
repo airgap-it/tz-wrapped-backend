@@ -1,227 +1,78 @@
-image: docker:latest
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  GOOGLE_TAG: eu.gcr.io/papers-kubernetes/tz-wrapped-backend:$CI_COMMIT_SHA
-  TEST_TAG: tz_wrapped_backend_test_$CI_COMMIT_SHA
-  GOOGLE_TAG_LATEST: eu.gcr.io/papers-kubernetes/tz-wrapped-backend:latest
-  GOOGLE_TAG_DEV: eu.gcr.io/papers-dev-kubernetes/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHA
-  GOOGLE_TAG_LATEST_DEV: eu.gcr.io/papers-dev-kubernetes/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
 
 stages:
   - build
-  - test
-  - build_serve
-  - publish
   - deploy
-  - provision
-  - drop_db
 
 build:
   stage: build
-  script:
-    - docker build --target build -t $TEST_TAG .
-  tags:
-    - docker
-
-test:
-  allow_failure: false
-  stage: test
-  script:
-    - docker run --name unit-$CI_COMMIT_SHA $TEST_TAG cargo test
-  after_script:
-    - docker rm -f unit-$CI_COMMIT_SHA || true
-  tags:
-    - docker
-
-build_serve:
-  stage: build_serve
-  script:
-    - docker build -t $GOOGLE_TAG .
-  only:
-    - master
-    - develop
-  tags:
-    - docker
-
-publish-dev:
-  stage: publish
-  image: google/cloud-sdk
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
   before_script:
-    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT_DEV
-    - gcloud config set project $GCLOUD_PROJECT_DEV
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud auth configure-docker
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker tag $GOOGLE_TAG $GOOGLE_TAG_DEV
-    - docker tag $GOOGLE_TAG $GOOGLE_TAG_LATEST_DEV
-    - docker push $GOOGLE_TAG_DEV
-    - docker push $GOOGLE_TAG_LATEST_DEV
-  only:
-    - develop
+    - docker build -t $CI_REGISTRY_IMAGE/tz-wrapped-backend:$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE/tz-wrapped-backend:latest .
+    - docker push $CI_REGISTRY_IMAGE/tz-wrapped-backend:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE/tz-wrapped-backend:latest
   tags:
     - docker
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
 
-publish-prod:
-  stage: publish
-  image: google/cloud-sdk
-  before_script:
-    - echo $GCLOUD_GOOGLE_KEY > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
-    - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set account $GCLOUD_ACCOUNT
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud auth configure-docker
+# Branches other than master: just verify the image builds (no push, no deploy).
+build-branch:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
   script:
-    - docker tag $GOOGLE_TAG $GOOGLE_TAG_LATEST
-    - docker push $GOOGLE_TAG
-    - docker push $GOOGLE_TAG_LATEST
-  only:
-    - master
+    - docker build -t $CI_REGISTRY_IMAGE/tz-wrapped-backend:$CI_COMMIT_SHA .
   tags:
     - docker
+  rules:
+    - if: $CI_COMMIT_BRANCH != "master"
 
-k8s-deploy-development:
+deploy-ondemand:
   stage: deploy
-  needs: ["publish-dev"]
-  when: manual
-  image: google/cloud-sdk
+  image: alpine:latest
+  needs: ["build"]
   before_script:
-    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT_DEV
-    - gcloud config set project $GCLOUD_PROJECT_DEV
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud container clusters get-credentials papers-cluster-development
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -p 60022 -H $DEPLOY_SERVER >> ~/.ssh/known_hosts
   script:
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__TO_BE_REPLACED_BY_IMAGE_TAG__|"$GOOGLE_TAG_DEV"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_USER__|"$DB_USER_DEVELOPMENT"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_PASSWORD__|"$DB_PASSWORD_DEVELOPMENT"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_DEVELOPMENT__|"$DB_NAME_DEVELOPMENT"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_HOST_DEVELOPMENT__|"$DB_HOST_DEVELOPMENT"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DOMAIN_NAME_DEVELOPMENT__|"$DOMAIN_NAME_DEVELOPMENT"|g" {} +
-    - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
-    - kubectl apply -f k8s/tz-wrapped/development/ --recursive
-    - kubectl apply -f k8s/tz-wrapped/common/ --recursive
-  only:
-    - develop
-  tags:
-    - docker
-
-k8s-deploy-production:
-  stage: deploy
-  needs: ["publish-prod"]
+    - |
+      echo "Copying $DEPLOY_COMPOSE_FILE to $DEPLOY_SERVER:$DOCKER_COMPOSE_PATH/docker-compose.yml"
+      scp -P 60022 "$DEPLOY_COMPOSE_FILE" "$DEPLOY_USER@$DEPLOY_SERVER:$DOCKER_COMPOSE_PATH/docker-compose.yml"
+    - |
+      ssh -p 60022 $DEPLOY_USER@$DEPLOY_SERVER "
+        sudo -u papers bash -c '
+          cd $DOCKER_COMPOSE_PATH &&
+          sed -i \"s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|\" .env &&
+          docker compose -f docker-compose.yml pull &&
+          docker compose -f docker-compose.yml up -d &&
+          sleep 10 &&
+          docker compose -f docker-compose.yml ps -a
+        '
+        echo \"Deployment completed successfully\"
+      "
+  environment:
+    name: production
+  variables:
+    IMAGE_TAG: $CI_COMMIT_SHA
+    DEPLOY_SERVER: papers-ov-6.papers.tech
+    DEPLOY_USER: papers
+    DOCKER_COMPOSE_PATH: /home/papers/tz-wrapped-backend
+    DEPLOY_COMPOSE_FILE: docker-compose.prd.yml
   when: manual
-  image: google/cloud-sdk
-  before_script:
-    - echo $GCLOUD_GOOGLE_KEY > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT
-    - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud container clusters get-credentials papers-cluster-production
-  script:
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__TO_BE_REPLACED_BY_IMAGE_TAG__|"$GOOGLE_TAG"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_USER__|"$DB_USER_PRODUCTION"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_PASSWORD__|"$DB_PASSWORD_PRODUCTION"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_NAME_PRODUCTION__|"$DB_NAME_PRODUCTION"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DB_HOST_PRODUCTION__|"$DB_HOST_PRODUCTION"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_HOST__|"$SMTP_HOST"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_USER__|"$SMTP_USER"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__SMTP_PASSWORD__|"$SMTP_PASS"|g" {} +
-    - find k8s -type f -name \*.yaml -exec sed -i "s|__DOMAIN_NAME_PRODUCTION__|"$DOMAIN_NAME_PRODUCTION"|g" {} +
-    - kubectl apply -f k8s/tz-wrapped/common/namespace.yaml
-    - kubectl apply -f k8s/tz-wrapped/production/ --recursive
-    - kubectl apply -f k8s/tz-wrapped/common/ --recursive
-  only:
-    - master
-  tags:
-    - docker
-
-provision-db-development:
-  stage: provision
-  only:
-    - develop
-    - master
-  when: manual
-  image: google/cloud-sdk
-  before_script:
-    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT_DEV
-    - gcloud config set project $GCLOUD_PROJECT_DEV
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud container clusters get-credentials papers-cluster-development
-    - export STOLON_PROXY=$(kubectl get pods --namespace postgres | grep postgres | awk 'NR==1{print $1}')
-  script:
-    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE DATABASE $DB_NAME_DEVELOPMENT\""  || true
-    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"CREATE USER $DB_USER_DEVELOPMENT WITH ENCRYPTED PASSWORD '$DB_PASSWORD_DEVELOPMENT'\"" || true
-    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $DB_NAME_DEVELOPMENT to $DB_USER_DEVELOPMENT\"" || true
-    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME --dbname=$DB_NAME_DEVELOPMENT postgres -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"'" || true
-  tags:
-    - docker
-
-provision-db-production:
-  stage: provision
-  only:
-    - master
-  when: manual
-  image: google/cloud-sdk
-  before_script:
-    - echo $GCLOUD_GOOGLE_KEY > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT
-    - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud container clusters get-credentials papers-cluster-production
-    - export STOLON_PROXY=$(kubectl get pods --all-namespaces | grep stolon-proxy | awk 'NR==1{print $2}')
-  script:
-    - kubectl exec $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_PROD_MASTER_PASSWORD && psql --host=localhost --username=$PG_PROD_MASTER_USERNAME postgres -c \"CREATE DATABASE $DB_NAME_PRODUCTION\""  || true
-    - kubectl exec $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_PROD_MASTER_PASSWORD && psql --host=localhost --username=$PG_PROD_MASTER_USERNAME postgres -c \"CREATE USER $DB_USER_PRODUCTION WITH ENCRYPTED PASSWORD '$DB_PASSWORD_PRODUCTION'\"" || true
-    - kubectl exec $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_PROD_MASTER_PASSWORD && psql --host=localhost --username=$PG_PROD_MASTER_USERNAME postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $DB_NAME_PRODUCTION to $DB_USER_PRODUCTION\"" || true
-    - kubectl exec $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_PROD_MASTER_PASSWORD && psql --host=localhost --username=$PG_PROD_MASTER_USERNAME --dbname=$DB_NAME_PRODUCTION postgres -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"'" || true
-  tags:
-    - docker
-
-drop-db-development:
-  stage: drop_db
-  only:
-    - develop
-    - master
-  when: manual
-  image: google/cloud-sdk
-  before_script:
-    - echo $GCLOUD_GOOGLE_KEY_DEV > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT_DEV --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT_DEV
-    - gcloud config set project $GCLOUD_PROJECT_DEV
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud container clusters get-credentials papers-cluster-development
-    - export STOLON_PROXY=$(kubectl get pods --namespace postgres | grep postgres | awk 'NR==1{print $1}')
-  script:
-    - kubectl exec -n postgres $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_DEV_MASTER_PASSWORD && psql --host=localhost --username=$PG_DEV_MASTER_USERNAME postgres -c \"DROP DATABASE $DB_NAME_DEVELOPMENT\""  || true
-  tags:
-    - docker
-
-drop-db-production:
-  stage: drop_db
-  only:
-    - master
-  when: manual
-  image: google/cloud-sdk
-  before_script:
-    - echo $GCLOUD_GOOGLE_KEY > key.json
-    - gcloud auth activate-service-account $GCLOUD_ACCOUNT --key-file key.json
-    - gcloud config set account $GCLOUD_ACCOUNT
-    - gcloud config set project $GCLOUD_PROJECT
-    - gcloud config set compute/zone $GCLOUD_ZONE
-    - gcloud container clusters get-credentials papers-cluster-production
-    - export STOLON_PROXY=$(kubectl get pods --all-namespaces | grep stolon-proxy | awk 'NR==1{print $2}')
-  script:
-    - kubectl exec $STOLON_PROXY -- bash -c "export PGPASSWORD=$PG_PROD_MASTER_PASSWORD && psql --host=localhost --username=$PG_PROD_MASTER_USERNAME postgres -c \"DROP DATABASE $DB_NAME_PRODUCTION\""  || true
-  tags:
-    - docker
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
