@@ -1,0 +1,24 @@
+# Build artifacts (rebuilt inside the image; also preserves the dummy-build cache layer)
+target/
+debug/
+
+# Git / VCS
+.git/
+.gitignore
+
+# Local env & secrets — never bake into an image
+.env
+.env.*
+!.env.*.example
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+**/*.rs.bk
+
+# Docker / CI files (not needed in the build context)
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.gitlab-ci.yml

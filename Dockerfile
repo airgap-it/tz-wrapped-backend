@@ -14,12 +14,12 @@ ADD . ./
 RUN rm ./target/release/deps/tz_wrapped_backend*
 RUN cargo install --locked --path .
 
-FROM debian:oldstable-slim
+FROM debian:bullseye-slim
 
 RUN apt-get update \
     && apt-get install -y ca-certificates tzdata \
-    && apt-get install -y libssl-dev \
-    && apt-get install -y libpq-dev \
+    && apt-get install -y libssl1.1 \
+    && apt-get install -y libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/tz-wrapped-backend
