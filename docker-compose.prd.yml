@@ -1,0 +1,73 @@
+# Production deployment via docker-compose (replaces the k8s/ manifests).
+#
+# tz-wrapped-backend is a single Rust binary (actix) that auto-runs its embedded
+# diesel migrations on startup (src/main.rs: embedded_migrations::run) — the
+# migrations create the "uuid-ossp" extension themselves, so the bundled
+# postgres needs no init script, just the DB owned by the app's DB user.
+#
+# Config: the binary reads config/*.toml baked into the image; RUN_ENV picks
+# Production.toml, and TZW_* env vars override individual keys (the config crate
+# maps TZW_SECTION__KEY -> [section] key). Only secrets / per-env values are set
+# here; the tezos nodes / contracts / admins stay in config/Production.toml.
+#
+# Bundles postgres (k8s used an external stolon DB — existing data must be
+# dumped from stolon and restored into this volume separately).
+#
+# Usage:
+#   cp .env.prd.example .env.prd     # fill in real secrets (see comments there)
+#   docker compose -f docker-compose.prd.yml --env-file .env.prd up -d
+#
+# TLS / routing (tz-wrapped.prod.gke.papers.tech, foundry-backend.wrappedtz.io)
+# is handled by an EXTERNAL reverse proxy. The backend is exposed on ${HOST_PORT}.
+
+services:
+  postgres:
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_DB: ${TZW_DATABASE__NAME}
+      POSTGRES_USER: ${TZW_DATABASE__USER}
+      POSTGRES_PASSWORD: ${TZW_DATABASE__PASSWORD}
+      # Match the lc_collate the app's own docker-compose used for the DB.
+      POSTGRES_INITDB_ARGS: "--lc-collate=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TZW_DATABASE__USER} -d ${TZW_DATABASE__NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ${IMAGE_REGISTRY}/tz-wrapped-backend:${IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      RUN_ENV: Production
+      TZW_SERVER__DOMAIN_NAME: ${TZW_SERVER__DOMAIN_NAME}
+      TZW_DATABASE__HOST: postgres
+      TZW_DATABASE__NAME: ${TZW_DATABASE__NAME}
+      TZW_DATABASE__USER: ${TZW_DATABASE__USER}
+      TZW_DATABASE__PASSWORD: ${TZW_DATABASE__PASSWORD}
+      TZW_SMTP__HOST: ${TZW_SMTP__HOST}
+      TZW_SMTP__USER: ${TZW_SMTP__USER}
+      TZW_SMTP__PASSWORD: ${TZW_SMTP__PASSWORD}
+    # k8s set no explicit resources; modest caps for a light Rust service.
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.01"
+          memory: 32M
+    ports:
+      # App listens on 0.0.0.0:80 (config/Default.toml).
+      - "${HOST_PORT}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # No healthcheck: the debian:oldstable-slim runtime image ships no http
+    # client (curl/wget); k8s probed via kubelet, not in-container.
+
+volumes:
+  postgres_data:
